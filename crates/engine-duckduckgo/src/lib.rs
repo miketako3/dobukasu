@@ -3,7 +3,7 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use dobukasu_core::{Engine, EngineContext, EngineError, Hit, Plugin, PluginOptions, SearchQuery};
+use dobukasu_core::{Engine, EngineContext, EngineError, Hit, Plugin, SearchQuery};
 use percent_encoding::percent_decode_str;
 use scraper::{ElementRef, Html, Selector};
 use url::Url;
@@ -21,7 +21,7 @@ inventory::submit! {
 }
 
 #[allow(clippy::unnecessary_wraps)]
-fn build(_options: &PluginOptions) -> Result<Arc<dyn Engine>, EngineError> {
+fn build() -> Result<Arc<dyn Engine>, EngineError> {
     Ok(Arc::new(DuckDuckGo))
 }
 

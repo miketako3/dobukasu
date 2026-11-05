@@ -23,7 +23,7 @@ impl From<url::ParseError> for EngineError {
     }
 }
 
-/// Errors raised while serving a request.
+/// Errors that stop a search before any engine can answer.
 #[derive(Debug, Clone, Error, PartialEq, Eq)]
 pub enum DobukasuError {
     #[error("{0}")]
@@ -32,30 +32,16 @@ pub enum DobukasuError {
     UnknownEngine(String),
     #[error("no engine is enabled")]
     NoEngineEnabled,
-    #[error("every engine failed")]
-    AllEnginesFailed,
-    #[error("{0}")]
-    Config(String),
 }
 
 impl DobukasuError {
+    /// Stable machine-readable name for this failure.
     #[must_use]
     pub fn code(&self) -> &'static str {
         match self {
             Self::InvalidRequest(_) => "invalid_request",
             Self::UnknownEngine(_) => "unknown_engine",
             Self::NoEngineEnabled => "no_engine_enabled",
-            Self::AllEnginesFailed => "all_engines_failed",
-            Self::Config(_) => "config",
-        }
-    }
-
-    #[must_use]
-    pub fn status(&self) -> u16 {
-        match self {
-            Self::InvalidRequest(_) | Self::UnknownEngine(_) => 400,
-            Self::NoEngineEnabled | Self::Config(_) => 500,
-            Self::AllEnginesFailed => 502,
         }
     }
 }

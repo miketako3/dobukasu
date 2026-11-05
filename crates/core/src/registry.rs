@@ -1,9 +1,8 @@
-//! The set of engines a request can reach.
+//! The set of engines a search can reach.
 
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
-use crate::config::Config;
 use crate::engine::{Engine, plugins};
 use crate::error::DobukasuError;
 
@@ -44,51 +43,28 @@ impl Registry {
         }
     }
 
-    /// Instantiate every plug-in linked into this binary, honouring
-    /// `[engines.<id>] enabled` and the plug-in default.
-    pub fn from_plugins(config: &Config) -> Result<Self, DobukasuError> {
+    /// Instantiate every plug-in linked into this binary, honouring each
+    /// plug-in's own default.
+    pub fn from_plugins() -> Result<Self, DobukasuError> {
         let mut engines = BTreeMap::new();
         let mut order = Vec::new();
 
         for plugin in plugins() {
-            let enabled = config
-                .engines
-                .get(plugin.id)
-                .and_then(|engine| engine.enabled)
-                .unwrap_or(plugin.enabled_by_default);
-            if !enabled {
+            if !plugin.enabled_by_default {
                 continue;
             }
-            let engine = (plugin.build)(&config.engine_options(plugin.id))
-                .map_err(|error| DobukasuError::Config(format!("engine {}: {error}", plugin.id)))?;
+            let engine = (plugin.build)().map_err(|error| {
+                DobukasuError::InvalidRequest(format!("engine {}: {error}", plugin.id))
+            })?;
             order.push(plugin.id);
             engines.insert(plugin.id, engine);
         }
-
-        for id in config.engines.keys() {
-            if crate::engine::plugin(id).is_none() {
-                return Err(DobukasuError::Config(format!("unknown engine: {id}")));
-            }
-        }
-
-        let defaults = match &config.search.engines {
-            Some(requested) => {
-                for id in requested {
-                    if !engines.contains_key(id.as_str()) {
-                        return Err(DobukasuError::Config(format!(
-                            "engine {id} is listed in search.engines but is not enabled"
-                        )));
-                    }
-                }
-                requested.clone()
-            }
-            None => order.iter().map(|id| (*id).to_owned()).collect(),
-        };
 
         if order.is_empty() {
             return Err(DobukasuError::NoEngineEnabled);
         }
 
+        let defaults = order.iter().map(|id| (*id).to_owned()).collect();
         Ok(Self {
             engines,
             order,
@@ -126,7 +102,7 @@ impl Registry {
             Some(ids) => {
                 if ids.is_empty() {
                     return Err(DobukasuError::InvalidRequest(
-                        "the engines parameter is empty".to_owned(),
+                        "the --engines list is empty".to_owned(),
                     ));
                 }
                 ids

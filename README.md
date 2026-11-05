@@ -1,205 +1,135 @@
 # dobukasu
 
-A minimal meta-search HTTP API for AI agents. JSON in, JSON out, no UI.
-
-`dobukasu` does one thing: take a query, ask several search engines in
-parallel, merge their rankings into one list, and return it. It is the part of
-[SearXNG](https://github.com/searxng/searxng) an agent actually needs, with the
-UI, categories, preferences and engine plugin zoo removed — and rebuilt in Rust
-around an everything-is-a-plugin core.
-
-[日本語](README.ja.md)
+A minimal meta-search CLI for AI agents. One query in, one merged JSON list out.
 
 [![CI](https://github.com/miketako3/dobukasu/actions/workflows/ci.yml/badge.svg)](https://github.com/miketako3/dobukasu/actions/workflows/ci.yml) [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
+`dobukasu` does one thing: take a query, ask several search engines in
+parallel, fuse their rankings into one list, and print it as JSON. It is the
+part of [SearXNG](https://github.com/searxng/searxng) an agent actually needs —
+no UI, no categories, no preferences, no server — rebuilt in Rust around an
+everything-is-a-plugin core.
+
+[日本語](README.ja.md)
 
 ```
-$ curl -s 'http://127.0.0.1:8080/search?q=rust+async+runtime&limit=2' | jq
+$ dobukasu "rust async runtime" --limit 2
 {
   "query": "rust async runtime",
   "results": [
     {
-      "title": "Tokio - An asynchronous Rust runtime",
-      "url": "https://tokio.rs/",
-      "snippet": "Tokio is an asynchronous runtime for the Rust programming language.",
+      "title": "The Async Ecosystem",
+      "url": "https://rust-lang.github.io/async-book/",
+      "snippet": "An asynchronous runtime, or executor, …",
       "engines": ["bing", "duckduckgo"],
       "score": 0.03278688524590164
-    },
-    {
-      "title": "Async in depth - Tokio",
-      "url": "https://tokio.rs/tokio/tutorial/async",
-      "snippet": "Async Rust is a cooperative multitasking model.",
-      "engines": ["bing"],
-      "score": 0.016129032258064516
     }
   ],
   "engines": [
     {"id": "bing", "status": "ok", "count": 10, "duration_ms": 412},
     {"id": "duckduckgo", "status": "ok", "count": 10, "duration_ms": 388},
     {"id": "google", "status": "error", "count": 0, "duration_ms": 201,
-     "error": "upstream blocked this client: Google served the JavaScript interstitial; set api_key and cx for the CSE backend"}
+     "error": "upstream blocked this client: …"}
   ],
   "took_ms": 430
 }
 ```
 
-## Why
+## Why a CLI and not an API
 
-An agent that wants to search the web needs three things: a stable JSON
-contract, results merged from more than one engine, and honest failure
-reporting. It does not need facets, an image proxy, an opensearch description,
-or a settings page. `dobukasu` is that reduced surface.
+An agent that wants to search needs one call and a stable contract, not a
+service to babysit. A process that prints JSON and exits is the smallest
+possible surface: no port, no lifecycle, no auth, nothing left running between
+questions. Every invocation is independent, so a wedged run cannot poison the
+next one.
 
-- **One endpoint.** `GET /search?q=` and `POST /search`. Nothing else to learn.
-- **Engines are plugins.** The core crate does not name a single engine. Each
-  engine is its own crate that submits itself to a compile-time registry.
+- **Everything is a plugin.** The core crate never names an engine. Each engine
+  is its own crate that submits itself to a compile-time registry.
 - **Rank fusion, not concatenation.** Reciprocal rank fusion means a page two
   engines agree on outranks a page that is merely first in one.
-- **Partial failure is normal.** One engine timing out or getting blocked does
-  not fail the request; it shows up in `engines[]` with a status and a message.
-- **Offline test suite.** Parsers are tested against captured pages, and the
-  HTTP contract is tested through the real router with only the network
-  boundary stubbed.
+- **Partial failure is normal.** One engine blocked or timing out does not fail
+  the search; it shows up in `engines[]` with a status and a reason.
+- **Offline test suite.** Parsers are pinned to captured pages, and the CLI
+  contract is tested through its real argument parser and output.
 
-## Quick start
+## Install
 
 ```sh
-cargo run --release
+cargo install --path crates/cli     # installs `dobukasu` into ~/.cargo/bin
 # or
-cargo install --path crates/server
-dobukasu
+cargo build --release               # ./target/release/dobukasu
 ```
 
-The server listens on `127.0.0.1:8080` by default.
+## Use
 
 ```sh
-curl -s 'http://127.0.0.1:8080/search?q=hello'
-curl -s 'http://127.0.0.1:8080/search?q=hello&engines=bing&limit=5'
-curl -s -X POST http://127.0.0.1:8080/search \
-  -H 'content-type: application/json' \
-  -d '{"q": "hello", "limit": 5, "lang": "ja"}'
-curl -s 'http://127.0.0.1:8080/engines'
-curl -s 'http://127.0.0.1:8080/healthz'
+dobukasu "query"                          # merged results
+dobukasu "query" --limit 5                # keep five
+dobukasu "query" --engines bing           # only ask Bing
+dobukasu "query" --timeout-ms 4000        # per-engine deadline
+dobukasu "query" --no-dedup               # same page once per engine
+dobukasu engines                          # what this build can ask
+dobukasu --help
 ```
 
-## HTTP API
+| Flag | Default | Meaning |
+| --- | --- | --- |
+| `--limit N` | `10` | merged results to keep |
+| `--engines a,b` | every default engine | only ask these |
+| `--timeout-ms N` | `8000` | per-engine deadline |
+| `--no-dedup` | off | keep the same page once per engine |
 
-### `GET /search` / `POST /search`
+Output is JSON on stdout: `{query, results[], engines[], took_ms}`, where each
+result carries the `engines` that returned it and its fusion `score`.
 
-| Parameter    | Type            | Default            | Meaning                                      |
-| ------------ | --------------- | ------------------ | -------------------------------------------- |
-| `q`          | string          | required           | Query text, at most 1024 characters.         |
-| `engines`    | comma list      | every enabled one  | `bing,duckduckgo`                            |
-| `limit`      | integer         | `10`               | Merged results, clamped to `search.max_limit`. |
-| `lang`       | string          | none               | Passed to engines (`hl`/`setlang`/`kl`).     |
-| `region`     | string          | none               | Country hint (`gl`/`cc`).                    |
-| `time_range` | `day\|week\|month\|year` | none      | Freshness filter where supported.            |
-| `safesearch` | boolean         | `false`            | Safe-search flag where supported.            |
-| `dedup`      | boolean         | `true`             | Merge identical URLs across engines.         |
-| `timeout_ms` | integer         | `8000`             | Per-engine deadline, clamped to 100–30000.   |
-| `format`     | —               | —                  | Not supported: the response is always JSON.  |
+| Exit code | Meaning |
+| --- | --- |
+| `0` | at least one engine answered |
+| `1` | every engine failed |
+| `2` | bad usage (unknown flag, unknown engine, empty query) |
 
-`POST` takes the same fields as a JSON object and accepts numbers and booleans
-natively (`{"limit": 5, "safesearch": true}`). Unknown fields are rejected.
+## Use it as an agent skill
 
-Response:
+[`skills/dobukasu/SKILL.md`](skills/dobukasu/SKILL.md) is a ready-made skill:
+it tells an agent when to search, how to run the CLI, how to read `engines[]`,
+and what to do when a search comes back empty.
 
-```jsonc
-{
-  "query": "…",           // the query as received
-  "results": [            // merged, de-duplicated, best first
-    {
-      "title": "…",
-      "url": "…",
-      "snippet": "…",
-      "engines": ["bing", "duckduckgo"],  // first engine first
-      "score": 0.0327                     // sum of 1/(60 + rank)
-    }
-  ],
-  "engines": [            // one report per engine that was asked
-    {
-      "id": "bing",
-      "status": "ok",     // ok | timeout | error
-      "count": 10,
-      "duration_ms": 412,
-      "error": "…"        // present only for error
-    }
-  ],
-  "took_ms": 430
-}
+```sh
+mkdir -p ~/.agents/skills
+cp -r skills/dobukasu ~/.agents/skills/
 ```
 
-Status codes: `200` even when some engines fail, `400` for a bad request,
-`502` when every engine failed. Errors always use the same shape:
-
-```json
-{"error": {"code": "unknown_engine", "message": "unknown engine: nope"}}
-```
-
-Codes: `invalid_request`, `unknown_engine`, `no_engine_enabled`,
-`all_engines_failed`, `config`.
-
-### `GET /engines`
-
-Lists the engines this process can call, whether each is in the default set,
-and the plug-in description. Use it to discover what is available before
-building a query.
-
-### `GET /healthz`
-
-`{"status":"ok","version":"0.1.0"}`.
+That is the whole integration. No MCP server, no tool schema to keep in sync.
 
 ## Engines
 
-| id           | keyless | notes                                                                 |
-| ------------ | ------- | --------------------------------------------------------------------- |
-| `bing`       | yes     | Scrapes `bing.com/search`; decodes `ck/a` redirects.                  |
-| `duckduckgo` | yes     | Scrapes `html.duckduckgo.com`; decodes `uddg` redirects.              |
-| `google`     | partly  | HTML by default, but Google usually serves a JavaScript interstitial. Set `api_key` and `cx` (Custom Search JSON API) to make it reliable. |
+| id | keyless | how |
+| --- | --- | --- |
+| `bing` | yes | scrapes `bing.com/search`; decodes `ck/a` redirects |
+| `duckduckgo` | yes | scrapes `html.duckduckgo.com`; decodes `uddg` redirects |
+| `google` | partly | scrapes `www.google.com/wml/search` with Symbian Nokia user agents — the trick SearXNG uses to get a JavaScript-free layout — and switches to the Custom Search JSON API when `GOOGLE_API_KEY` and `GOOGLE_CX` are set |
 
-All three are compiled in and enabled by default. Google is the one that will
-report `error` out of the box on most hosts; that is deliberate — claiming
-"no results" would be a lie. Either give it Custom Search credentials or turn
-it off:
+All three are compiled in and enabled by default.
 
-```toml
-[engines.google]
-enabled = false
-```
+**About Google.** The ordinary `/search` endpoint now answers automated clients
+with a JavaScript interstitial or a 403, which is why scraping it directly
+fails. The `/wml/search` layout is the one Google still serves to very old
+mobile user agents, and it is what SearXNG parses today. It is still a scraped
+endpoint: if Google refuses this host, the engine reports `blocked` with a
+message saying so rather than returning an empty list. Set `GOOGLE_API_KEY` and
+`GOOGLE_CX` (a free Custom Search key) for a contract that does not depend on
+Google's goodwill.
 
-DuckDuckGo rate-limits bursts. When it does, it answers 202 with a challenge
-page; the plug-in recognises that page and reports `status: "error"` with a
-`Blocked` message instead of pretending the query had no hits.
+**About DuckDuckGo.** It rate-limits bursts, answering with a 202 challenge
+page. That page is recognised and reported as `blocked`; "no hits" and "we were
+turned away" are different answers.
 
-## Configuration
+## Write an engine plugin
 
-Precedence: built-in defaults → `dobukasu.toml` (or `$DOBUKASU_CONFIG`) →
-environment variables. See [`dobukasu.example.toml`](dobukasu.example.toml).
-
-| Variable               | Overrides                |
-| ---------------------- | ------------------------ |
-| `DOBUKASU_BIND`        | `server.bind`            |
-| `DOBUKASU_LIMIT`       | `search.limit`           |
-| `DOBUKASU_MAX_LIMIT`   | `search.max_limit`       |
-| `DOBUKASU_TIMEOUT_MS`  | `search.timeout_ms`      |
-| `DOBUKASU_DEDUP`       | `search.dedup`           |
-| `DOBUKASU_USER_AGENT`  | `search.user_agent`      |
-| `DOBUKASU_ENGINES`     | `search.engines`         |
-| `DOBUKASU_CONFIG`      | config file path         |
-| `GOOGLE_API_KEY`       | Google `api_key`         |
-| `GOOGLE_CX`            | Google `cx`              |
-| `RUST_LOG`             | log filter (`dobukasu=info`) |
-
-## Writing an engine plug-in
-
-An engine is a crate. It implements `Engine`, submits a `Plugin` with
-`inventory`, and is linked into the server binary. The core never imports it.
+An engine is a crate: it implements `Engine`, submits a `Plugin` with
+`inventory`, and gets linked into the binary. The core never imports it.
 
 ```rust
-use std::sync::Arc;
-use async_trait::async_trait;
-use dobukasu_core::{Engine, EngineContext, EngineError, Hit, Plugin, PluginOptions, SearchQuery};
-
 pub const ID: &str = "example";
 
 inventory::submit! {
@@ -212,18 +142,16 @@ inventory::submit! {
     }
 }
 
-fn build(_options: &PluginOptions) -> Result<Arc<dyn Engine>, EngineError> {
+fn build() -> Result<Arc<dyn Engine>, EngineError> {
     Ok(Arc::new(Example))
 }
-
-pub struct Example;
 
 #[async_trait]
 impl Engine for Example {
     fn id(&self) -> &'static str { ID }
 
     async fn search(&self, query: &SearchQuery, ctx: &EngineContext) -> Result<Vec<Hit>, EngineError> {
-        let mut url = url::Url::parse("https://example.com/search")?;
+        let mut url = Url::parse("https://example.com/search")?;
         url.query_pairs_mut().append_pair("q", &query.text);
         let html = ctx.fetch_text(url).await?;
         Ok(parse(&html))
@@ -236,10 +164,7 @@ pub fn parse(html: &str) -> Vec<Hit> { /* selectors */ }
 
 Keep the parser a pure `&str -> Vec<Hit>` function. That is the engine's real
 contract with its upstream, it survives any refactor of the HTTP plumbing, and
-it is what the offline fixture tests exercise.
-
-Register it by adding the crate to `crates/server/Cargo.toml` and linking it in
-`main.rs`:
+it is what the fixture tests exercise. Then link it in `crates/cli/src/main.rs`:
 
 ```rust
 use dobukasu_engine_example as _;
@@ -248,65 +173,51 @@ use dobukasu_engine_example as _;
 ## Architecture
 
 ```
-crates/core            engine trait, compile-time registry, config, rank fusion, HTTP API
-crates/engine-bing     one plug-in each
+crates/core             Engine trait, compile-time registry, rank fusion, runner
+crates/engine-bing      one plug-in each
 crates/engine-duckduckgo
 crates/engine-google
-crates/server          the `dobukasu` binary: links every bundled plug-in
+crates/cli              the `dobukasu` binary: links every bundled plug-in
+skills/dobukasu         the agent skill that calls it
 ```
 
-Everything is a plugin in the sense that matters: `core` has no dependency on
-any engine, `Registry` is built from whatever `inventory` collected, and
-disabling an engine is configuration, not a code change. Rank fusion and the
-HTTP contract live in core and are shared by every engine.
-
-A request flows: parse parameters → resolve engines → fan out with a per-engine
-timeout → canonicalise URLs and fuse ranks (`fuse`) → truncate → serialise.
+A run flows: parse arguments → resolve engines → fan out with a per-engine
+timeout → canonicalise URLs and fuse ranks → truncate → print.
 
 ## Testing
 
 ```sh
-cargo test --workspace          # offline: fixtures, HTTP contract, fusion, config
-cargo test --workspace -- --ignored   # live smoke tests (needs network)
+cargo test --workspace
 cargo clippy --workspace --all-targets -- -D warnings
 cargo fmt --all -- --check
 ```
 
-The suite follows one rule: assert observable behaviour through the public API.
-Engines are the only process-external dependency, so they are the only thing
-stubbed; URL identity, ranking, parameter parsing, error shapes and status
-codes are all exercised through the real router.
+The suite asserts observable behaviour through public seams. Engines are the
+only process-external dependency, so they are the only thing stubbed; URL
+identity, ranking, argument parsing, exit codes and error reporting are all
+exercised for real. [`docs/testing.md`](docs/testing.md) explains the shape of
+the suite and what mutation testing has caught.
 
 ```sh
 cargo install cargo-mutants
-cargo mutants -p dobukasu-core
+cargo mutants --workspace
 ```
-
-Mutation testing is the quality gate for weak assertions: a surviving mutant on
-URL canonicalisation or fusion scoring means the suite is not actually pinning
-the behaviour it claims to. The reasoning behind the suite's shape is written
-down in [docs/testing.md](docs/testing.md).
 
 ## Known limits
 
-- **Scraped engines are best effort.** Under bot mitigation, Bing and
-  DuckDuckGo sometimes answer `200` with unrelated pages instead of an error.
-  `dobukasu` reports what the upstream returned; it cannot tell relevance from
-  the markup. Treat `engines[]` as a status report, not a quality guarantee.
-- **No pagination.** One page per engine, no `start`/`page` parameter. An agent
-  that wants more should rephrase the query.
-- **No caching.** Every request fans out. Put it behind your own cache if you
-  call it in a loop.
-- **No authentication.** Bind it to loopback or put a reverse proxy in front
-  before exposing it to a network.
+- **Scraped engines are best effort.** Under bot mitigation, Bing sometimes
+  answers `200` with unrelated pages instead of an error. `dobukasu` reports
+  what the upstream returned; it cannot judge relevance from the markup.
+- **No pagination.** One page per engine. Reformulate the query instead.
+- **No caching.** Every invocation fans out; wrap it if you call it in a loop.
+- **No server.** Three engines per query, then exit. That is deliberate.
 
 ## Legal and etiquette
 
-`dobukasu` fetches public search result pages the same way a browser does. That
-is not a licence to ignore the terms of service of the engines you enable, nor
+`dobukasu` fetches public search result pages the way a browser does. That is
+not a licence to ignore the terms of service of the engines you enable, nor
 `robots.txt`, nor rate limits. Run it for your own use, keep the request rate
-low, deploy it behind authentication if it is reachable from the internet, and
-prefer an engine's official API (as the Google plug-in does) when one exists.
+low, and prefer an official API (as the Google plug-in does) when one exists.
 The authors are not responsible for how you use it.
 
 ## License

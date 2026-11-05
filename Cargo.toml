@@ -5,7 +5,7 @@ members = [
     "crates/engine-bing",
     "crates/engine-duckduckgo",
     "crates/engine-google",
-    "crates/server",
+    "crates/cli",
 ]
 
 [workspace.package]

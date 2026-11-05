@@ -94,13 +94,25 @@ pub struct EngineReport {
     pub error: Option<String>,
 }
 
-/// The body returned by `GET /search` and `POST /search`.
+/// Everything one search produced: the merged list and how each engine did.
 #[derive(Debug, Clone, PartialEq, Serialize)]
-pub struct SearchResponse {
+pub struct SearchOutcome {
     pub query: String,
     pub results: Vec<SearchResult>,
     pub engines: Vec<EngineReport>,
     pub took_ms: u64,
+}
+
+impl SearchOutcome {
+    /// True when every engine that was asked failed.
+    #[must_use]
+    pub fn all_failed(&self) -> bool {
+        !self.engines.is_empty()
+            && self
+                .engines
+                .iter()
+                .all(|report| report.status != EngineStatus::Ok)
+    }
 }
 
 /// Hits returned by a single engine, in the engine's own ranking order.

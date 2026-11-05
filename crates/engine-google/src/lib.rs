@@ -1,84 +1,68 @@
 //! Google engine plug-in.
 //!
-//! Two backends share one id: the keyless HTML endpoint, and the official
-//! Custom Search JSON API when `api_key`/`cx` are configured. Google serves a
-//! JavaScript interstitial to many clients, so the HTML backend reports
-//! [`EngineError::Blocked`] instead of pretending it found nothing.
+//! Two keyless-hostile backends share one id:
+//!
+//! * the WML endpoint `www.google.com/wml/search`, requested with a Symbian
+//!   Nokia user agent — this is what `SearXNG` does, and it is the only scraped
+//!   layout Google still serves without JavaScript;
+//! * the official Custom Search JSON API when `GOOGLE_API_KEY` and `GOOGLE_CX`
+//!   are set.
+//!
+//! Google blocks clients it does not like (403, or a page that says "enable
+//! JavaScript"), so the scraped backend reports [`EngineError::Blocked`] rather
+//! than pretending it found nothing.
 
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use dobukasu_core::{Engine, EngineContext, EngineError, Hit, Plugin, PluginOptions, SearchQuery};
+use dobukasu_core::{Engine, EngineContext, EngineError, Hit, Plugin, SearchQuery};
 use scraper::{ElementRef, Html, Selector};
 use serde::Deserialize;
 use url::Url;
 
 pub const ID: &str = "google";
 
+/// User agents that make Google serve the WML layout. Rotated like `SearXNG`.
+const NOKIA_AGENTS: [&str; 5] = [
+    "Nokia7610/2.0 (5.0509.0) SymbianOS/7.0s Series60/2.1 Profile/MIDP-2.0 Configuration/CLDC-1.0",
+    "Nokia6230/2.0 (05.50) Profile/MIDP-2.0 Configuration/CLDC-1.1",
+    "Nokia6230i/2.0 (03.80) Profile/MIDP-2.0 Configuration/CLDC-1.1",
+    "Nokia6280/2.0 (03.60) Profile/MIDP-2.0 Configuration/CLDC-1.1",
+    "NokiaN72/2.0617.1.0.3 Series60/2.8 Profile/MIDP-2.0 Configuration/CLDC-1.1",
+];
+
 inventory::submit! {
     Plugin {
         id: ID,
         label: "Google",
-        description: "HTML endpoint by default; Custom Search JSON API when api_key and cx are set.",
+        description: "WML endpoint by default; Custom Search JSON API when GOOGLE_API_KEY and GOOGLE_CX are set.",
         enabled_by_default: true,
         build,
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum Mode {
-    Auto,
-    Html,
-    Cse,
-}
-
 pub struct Google {
-    mode: Mode,
     api_key: Option<String>,
     cx: Option<String>,
 }
 
-fn build(options: &PluginOptions) -> Result<Arc<dyn Engine>, EngineError> {
-    let mode = match options
-        .string_or("mode", "auto")
-        .to_ascii_lowercase()
-        .as_str()
-    {
-        "auto" => Mode::Auto,
-        "html" => Mode::Html,
-        "cse" => Mode::Cse,
-        other => {
-            return Err(EngineError::Config(format!(
-                "unknown mode {other}; expected auto, html or cse"
-            )));
-        }
-    };
-    let api_key = value(options.string("api_key"), "GOOGLE_API_KEY");
-    let cx = value(options.string("cx"), "GOOGLE_CX");
-
-    if mode == Mode::Cse && (api_key.is_none() || cx.is_none()) {
-        return Err(EngineError::Config(
-            "mode = cse needs api_key and cx (or GOOGLE_API_KEY and GOOGLE_CX)".to_owned(),
-        ));
-    }
-
-    Ok(Arc::new(Google { mode, api_key, cx }))
+#[allow(clippy::unnecessary_wraps)]
+fn build() -> Result<Arc<dyn Engine>, EngineError> {
+    Ok(Arc::new(Google {
+        api_key: env_value("GOOGLE_API_KEY"),
+        cx: env_value("GOOGLE_CX"),
+    }))
 }
 
-fn value(configured: Option<&str>, env: &str) -> Option<String> {
-    configured
-        .map(ToOwned::to_owned)
-        .or_else(|| std::env::var(env).ok())
+fn env_value(name: &str) -> Option<String> {
+    std::env::var(name)
+        .ok()
         .filter(|value| !value.trim().is_empty())
 }
 
 impl Google {
     fn uses_cse(&self) -> bool {
-        match self.mode {
-            Mode::Cse => true,
-            Mode::Html => false,
-            Mode::Auto => self.api_key.is_some() && self.cx.is_some(),
-        }
+        self.api_key.is_some() && self.cx.is_some()
     }
 }
 
@@ -96,24 +80,22 @@ impl Engine for Google {
         if self.uses_cse() {
             self.search_cse(query, context).await
         } else {
-            self.search_html(query, context).await
+            self.search_wml(query, context).await
         }
     }
 }
 
 impl Google {
-    async fn search_html(
+    async fn search_wml(
         &self,
         query: &SearchQuery,
         context: &EngineContext,
     ) -> Result<Vec<Hit>, EngineError> {
-        let mut url = Url::parse("https://www.google.com/search")
-            .map_err(|error| EngineError::Config(error.to_string()))?;
+        let mut url = Url::parse("https://www.google.com/wml/search")?;
         {
             let mut pairs = url.query_pairs_mut();
             pairs.append_pair("q", &query.text);
-            pairs.append_pair("num", &query.limit.to_string());
-            pairs.append_pair("gbv", "1");
+            pairs.append_pair("sca_esv", "1");
             if let Some(language) = query.lang.as_deref() {
                 pairs.append_pair("hl", language);
             }
@@ -121,16 +103,26 @@ impl Google {
                 pairs.append_pair("gl", region);
             }
             pairs.append_pair("safe", if query.safe_search { "active" } else { "off" });
+            if let Some(range) = query.time_range {
+                let span = match range {
+                    dobukasu_core::TimeRange::Day => "d",
+                    dobukasu_core::TimeRange::Week => "w",
+                    dobukasu_core::TimeRange::Month => "m",
+                    dobukasu_core::TimeRange::Year => "y",
+                };
+                pairs.append_pair("tbs", &format!("qdr:{span}"));
+            }
         }
 
-        let html = context.fetch_text(url).await?;
-        if is_blocked_page(&html) {
+        let agent = NOKIA_AGENTS[query.text.len() % NOKIA_AGENTS.len()];
+        let body = context.fetch_text_as(url, agent).await?;
+        if is_blocked_page(&body) {
             return Err(EngineError::Blocked(
-                "Google served the JavaScript interstitial; set api_key and cx for the CSE backend"
+                "Google refused a JavaScript-free request; set GOOGLE_API_KEY and GOOGLE_CX for the Custom Search backend"
                     .to_owned(),
             ));
         }
-        Ok(parse(&html))
+        Ok(parse(&body))
     }
 
     async fn search_cse(
@@ -141,14 +133,13 @@ impl Google {
         let api_key = self
             .api_key
             .as_deref()
-            .ok_or_else(|| EngineError::Config("missing api_key".to_owned()))?;
+            .ok_or_else(|| EngineError::Config("missing GOOGLE_API_KEY".to_owned()))?;
         let cx = self
             .cx
             .as_deref()
-            .ok_or_else(|| EngineError::Config("missing cx".to_owned()))?;
+            .ok_or_else(|| EngineError::Config("missing GOOGLE_CX".to_owned()))?;
 
-        let mut url = Url::parse("https://www.googleapis.com/customsearch/v1")
-            .map_err(|error| EngineError::Config(error.to_string()))?;
+        let mut url = Url::parse("https://www.googleapis.com/customsearch/v1")?;
         {
             let mut pairs = url.query_pairs_mut();
             pairs.append_pair("key", api_key);
@@ -175,29 +166,33 @@ impl Google {
     }
 }
 
-/// Does this page say "run JavaScript or prove you are human"?
+/// Does this page say "run JavaScript" or "you are a robot"?
 #[must_use]
 pub fn is_blocked_page(html: &str) -> bool {
     html.contains("enablejs")
         || html.contains("unusual traffic")
         || html.contains("/httpservice/retry/")
+        || html.contains("Error 403")
 }
 
-/// Parse a Google results page. Public because it is the engine's contract
-/// with its upstream markup.
+/// Parse the WML results layout.
+///
+/// The selectors are the contract `SearXNG` parses too: `div.zMzFAb` per result,
+/// `a.fuLhoc` around the link, `span.CVA68e` around the title and
+/// `div.taTFJ span.FrIlee` around the snippet.
 #[must_use]
 pub fn parse(html: &str) -> Vec<Hit> {
     let document = Html::parse_document(html);
-    let Ok(container) = Selector::parse("div.g, div.MjjYud") else {
+    let Ok(container) = Selector::parse("div.zMzFAb") else {
         return Vec::new();
     };
-    let Ok(link) = Selector::parse("div.yuRUbf a, a[href]") else {
+    let Ok(link) = Selector::parse("a.fuLhoc") else {
         return Vec::new();
     };
-    let Ok(heading) = Selector::parse("h3") else {
+    let Ok(heading) = Selector::parse("span.CVA68e") else {
         return Vec::new();
     };
-    let Ok(snippet) = Selector::parse(".VwiC3b, .IsZvec, span.aCOpRe") else {
+    let Ok(snippet) = Selector::parse("div.taTFJ span.FrIlee") else {
         return Vec::new();
     };
 
@@ -256,20 +251,20 @@ pub fn parse_cse(body: &str) -> Result<Vec<Hit>, EngineError> {
         .collect())
 }
 
+/// Turn a Google href into the page it points at: absolute, or `/url?q=…`.
 fn resolve(href: &str) -> Option<String> {
+    let href = href.trim();
     if href.starts_with("http://") || href.starts_with("https://") {
-        return Some(href.to_owned());
+        let url = Url::parse(href).ok()?;
+        return matches!(url.scheme(), "http" | "https").then(|| url.to_string());
     }
     if !href.starts_with('/') {
         return None;
     }
     let absolute = Url::parse(&format!("https://www.google.com{href}")).ok()?;
-    if absolute.path() != "/url" {
-        return None;
-    }
     let target = absolute
         .query_pairs()
-        .find(|(key, _)| key == "q")
+        .find(|(key, _)| key == "q" || key == "url")
         .map(|(_, value)| value.into_owned())?;
     let url = Url::parse(&target).ok()?;
     matches!(url.scheme(), "http" | "https").then(|| url.to_string())

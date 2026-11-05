@@ -1,19 +1,19 @@
-//! dobukasu — a minimal, plug-in based meta-search API for AI agents.
+//! The parts that never change when an engine does: what a result is, how
+//! rankings are merged, and how an engine is registered.
 
-pub mod api;
-pub mod config;
-pub mod engine;
-pub mod error;
-pub mod merge;
-pub mod model;
-pub mod registry;
+mod engine;
+mod error;
+mod merge;
+mod model;
+mod registry;
+mod search;
 
-pub use config::Config;
-pub use engine::{Engine, EngineContext, Plugin, PluginOptions};
+pub use engine::{Engine, EngineContext, Plugin, plugins};
 pub use error::{DobukasuError, EngineError};
 pub use merge::{canonical_url, fuse};
 pub use model::{
-    EngineHits, EngineReport, EngineStatus, Hit, SearchQuery, SearchResponse, SearchResult,
+    EngineHits, EngineReport, EngineStatus, Hit, SearchOutcome, SearchQuery, SearchResult,
     TimeRange,
 };
 pub use registry::Registry;
+pub use search::search;

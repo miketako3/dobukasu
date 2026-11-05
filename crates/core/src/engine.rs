@@ -1,6 +1,5 @@
 //! Engine plug-in contract and the compile-time registry plugins register into.
 
-use std::collections::BTreeMap;
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -40,11 +39,15 @@ impl EngineContext {
     }
 
     pub fn request(&self, url: Url) -> reqwest::RequestBuilder {
+        self.request_as(url, &self.user_agent.clone())
+    }
+
+    fn request_as(&self, url: Url, user_agent: &str) -> reqwest::RequestBuilder {
         let mut request = self
             .http
             .get(url)
             .timeout(self.timeout)
-            .header(USER_AGENT, &self.user_agent)
+            .header(USER_AGENT, user_agent)
             .header(ACCEPT, HTML_ACCEPT);
         if let Some(language) = &self.accept_language {
             request = request.header(ACCEPT_LANGUAGE, language);
@@ -55,14 +58,26 @@ impl EngineContext {
     /// Fetch a page and return its body, mapping transport failures onto
     /// [`EngineError`].
     pub async fn fetch_text(&self, url: Url) -> Result<String, EngineError> {
+        self.fetch_text_as(url, &self.user_agent.clone()).await
+    }
+
+    /// Fetch a page with an engine-specific user agent, for upstreams that
+    /// only serve their plain layout to particular clients (Google and its
+    /// Nokia mobile agents).
+    pub async fn fetch_text_as(&self, url: Url, user_agent: &str) -> Result<String, EngineError> {
         let response = self
-            .request(url)
+            .request_as(url, user_agent)
             .send()
             .await
             .map_err(|error| transport(&error))?;
         let status = response.status();
         if status == reqwest::StatusCode::TOO_MANY_REQUESTS {
             return Err(EngineError::Blocked("rate limited".to_owned()));
+        }
+        if status == reqwest::StatusCode::FORBIDDEN {
+            return Err(EngineError::Blocked(
+                "upstream answered 403 for this client".to_owned(),
+            ));
         }
         if !status.is_success() {
             return Err(EngineError::Status(status.as_u16()));
@@ -91,29 +106,6 @@ pub trait Engine: Send + Sync + 'static {
     ) -> Result<Vec<Hit>, EngineError>;
 }
 
-/// Typed access to `[engines.<id>]` configuration values.
-#[derive(Debug, Clone, Default)]
-pub struct PluginOptions {
-    values: BTreeMap<String, toml::Value>,
-}
-
-impl PluginOptions {
-    #[must_use]
-    pub fn new(values: BTreeMap<String, toml::Value>) -> Self {
-        Self { values }
-    }
-
-    #[must_use]
-    pub fn string(&self, key: &str) -> Option<&str> {
-        self.values.get(key).and_then(toml::Value::as_str)
-    }
-
-    #[must_use]
-    pub fn string_or(&self, key: &str, fallback: &str) -> String {
-        self.string(key).unwrap_or(fallback).to_owned()
-    }
-}
-
 /// One compile-time plug-in. Every engine crate submits one of these; the core
 /// crate never names an engine.
 pub struct Plugin {
@@ -121,7 +113,7 @@ pub struct Plugin {
     pub label: &'static str,
     pub description: &'static str,
     pub enabled_by_default: bool,
-    pub build: fn(&PluginOptions) -> Result<Arc<dyn Engine>, EngineError>,
+    pub build: fn() -> Result<Arc<dyn Engine>, EngineError>,
 }
 
 inventory::collect!(Plugin);
@@ -132,9 +124,4 @@ pub fn plugins() -> Vec<&'static Plugin> {
     let mut all: Vec<&'static Plugin> = inventory::iter::<Plugin>.into_iter().collect();
     all.sort_by_key(|plugin| plugin.id);
     all
-}
-
-#[must_use]
-pub fn plugin(id: &str) -> Option<&'static Plugin> {
-    plugins().into_iter().find(|plugin| plugin.id == id)
 }

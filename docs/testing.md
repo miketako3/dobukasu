@@ -15,11 +15,11 @@ passing for as long as the product keeps that promise.
 | --- | --- | --- |
 | URL identity | `crates/core/tests/url_identity.rs` | Which URLs count as the same page. |
 | Rank fusion | `crates/core/tests/rank_fusion.rs` | Ordering, de-duplication, truncation, the RRF score. |
-| HTTP contract | `crates/core/tests/http_api.rs` | Parameters, status codes, JSON shape, partial failure, timeouts. |
-| HTTP adapter | `crates/core/tests/http_fetch.rs` | How an upstream status becomes an `EngineError`. |
-| Configuration | `crates/core/tests/config_layers.rs` | Defaults, file, environment, validation. |
+| Runner | `crates/core/tests/search.rs` | Partial failure, timeouts, the all-failed flag, limit, cross-engine merging. |
+| HTTP adapter | `crates/core/tests/fetch.rs` | How an upstream status becomes an `EngineError`. |
 | Upstream HTML | `crates/*/tests/contract.rs` | `&str -> Vec<Hit>` for captured pages. |
-| Bundling | `crates/server/tests/bundled_engines.rs` | Which plug-ins a built binary actually contains. |
+| CLI contract | `crates/cli/tests/cli.rs` | Arguments, JSON on stdout, stderr, exit codes. |
+| Arguments | `crates/cli/src/lib.rs` (`mod tests`) | Parsing rules the binary relies on. |
 
 Two conventions follow from the rule.
 
@@ -29,9 +29,9 @@ The parser tests list titles and URLs by hand instead of re-parsing a second
 way. If the code and the test shared a helper, both would be wrong together.
 
 **Doubles only at the process boundary.** Engines are the only thing this
-server talks to over the network, so they are the only thing replaced
-(`crates/core/tests/common/mod.rs`). Everything else — the router, parameter
-parsing, fusion, serialisation — runs for real in the tests.
+program talks to over the network, so they are the only thing replaced. The
+argument parser, the runner, fusion and the JSON rendering all run for real;
+the CLI tests build a `Cli` from stub engines and read its `Output`.
 
 ## Fixtures
 
@@ -41,9 +41,9 @@ parsing, fusion, serialisation — runs for real in the tests.
   DuckDuckGo serves when it rate-limits a client.
 - `crates/engine-google/tests/fixtures/blocked.html` — the real JavaScript
   interstitial.
-- `crates/engine-google/tests/fixtures/results.html` — a shape fixture: Google
-  will not serve a real results page to an automated client, so this file
-  reproduces the markup the HTML backend targets.
+- `crates/engine-google/tests/fixtures/wml.html` — a shape fixture: Google
+  answers this host with 403 or a JavaScript interstitial instead of results,
+  so this file reproduces the `/wml/search` layout the backend targets.
 
 Fixtures are inputs, not snapshots. They never change when the code changes, so
 a diff in a fixture means the upstream changed, not that someone edited the

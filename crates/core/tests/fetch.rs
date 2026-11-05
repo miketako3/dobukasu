@@ -97,3 +97,25 @@ async fn an_unreachable_host_is_a_transport_error() {
 
     assert!(matches!(error, EngineError::Transport(_)), "{error:?}");
 }
+
+#[tokio::test]
+async fn an_engine_can_ask_for_its_own_user_agent() {
+    let base = serve(Router::new().route(
+        "/",
+        get(|headers: axum::http::HeaderMap| async move {
+            headers
+                .get(axum::http::header::USER_AGENT)
+                .and_then(|value| value.to_str().ok())
+                .unwrap_or("missing")
+                .to_owned()
+        }),
+    ))
+    .await;
+
+    let body = context(1_000)
+        .fetch_text_as(base.parse().expect("url"), "Nokia7610/2.0")
+        .await
+        .expect("body");
+
+    assert_eq!(body, "Nokia7610/2.0");
+}

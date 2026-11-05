@@ -1,13 +1,14 @@
-//! Google's contract with its two upstreams: the HTML page and the Custom
+//! Google's contract with its two upstreams: the WML page and the Custom
 //! Search JSON API.
 //!
-//! Google serves a JavaScript interstitial instead of results to most
-//! non-browser clients, so `results.html` is a shape fixture built from the
-//! markup the HTML backend targets, while `blocked.html` is the real
-//! interstitial.
+//! Google answers this host with 403 or a JavaScript interstitial instead of a
+//! results page, so `wml.html` is a shape fixture built from the layout the
+//! WML backend targets (the same selectors `SearXNG` parses), while
+//! `blocked.html` is the real interstitial that Google serves.
+
+use std::path::Path;
 
 use dobukasu_engine_google::{is_blocked_page, parse, parse_cse};
-use std::path::Path;
 
 fn fixture(name: &str) -> String {
     let path = Path::new(env!("CARGO_MANIFEST_DIR"))
@@ -17,50 +18,50 @@ fn fixture(name: &str) -> String {
 }
 
 #[test]
-fn a_results_page_yields_the_ranked_hits() {
-    let hits = parse(&fixture("results.html"));
+fn a_wml_page_yields_the_ranked_hits() {
+    let hits = parse(&fixture("wml.html"));
 
-    assert_eq!(hits.len(), 4, "{hits:#?}");
-    assert_eq!(hits[0].title, "Rust Programming Language");
-    assert_eq!(hits[0].url, "https://rust-lang.org/");
+    assert_eq!(hits.len(), 3, "{hits:#?}");
+    assert_eq!(hits[0].title, "Tokio — an asynchronous Rust runtime");
+    assert_eq!(hits[0].url, "https://tokio.rs/");
     assert_eq!(
         hits[0].snippet,
-        "A language empowering everyone to build reliable and efficient software."
+        "Tokio is a runtime for writing reliable network applications without the boilerplate."
     );
-    assert_eq!(
-        hits[1].url,
-        "https://en.wikipedia.org/wiki/Rust_(programming_language)"
-    );
-    assert_eq!(hits[2].url, "https://doc.rust-lang.org/book/");
-    assert_eq!(
-        hits[2].snippet,
-        "The book is the primary learning resource."
+    assert_eq!(hits[1].url, "https://docs.rs/tokio/latest/tokio/");
+    assert_eq!(hits[2].url, "https://tokio.rs/tokio/tutorial");
+    assert_eq!(hits[2].snippet, "");
+}
+
+#[test]
+fn a_result_without_a_destination_is_dropped() {
+    let hits = parse(&fixture("wml.html"));
+
+    assert!(
+        hits.iter().all(|hit| !hit.title.contains("nowhere to go")),
+        "{hits:#?}"
     );
 }
 
 #[test]
-fn the_same_link_is_reported_once() {
-    let hits = parse(&fixture("results.html"));
+fn markup_outside_the_result_container_is_not_a_hit() {
+    let hits = parse(&fixture("wml.html"));
 
-    assert_eq!(
+    assert!(
         hits.iter()
-            .filter(|hit| hit.url == "https://duplicate.test/page")
-            .count(),
-        1
+            .all(|hit| hit.url != "https://example.com/not-wml")
     );
-}
-
-#[test]
-fn navigation_links_are_not_results() {
-    let hits = parse(&fixture("results.html"));
-
-    assert!(hits.iter().all(|hit| !hit.url.contains("/preferences")));
 }
 
 #[test]
 fn the_javascript_interstitial_is_recognised() {
     assert!(is_blocked_page(&fixture("blocked.html")));
-    assert!(!is_blocked_page(&fixture("results.html")));
+    assert!(!is_blocked_page(&fixture("wml.html")));
+}
+
+#[test]
+fn a_forbidden_page_is_recognised() {
+    assert!(is_blocked_page("<title>Error 403 (Forbidden)!!1</title>"));
 }
 
 #[test]
