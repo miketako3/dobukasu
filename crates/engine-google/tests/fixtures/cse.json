@@ -1,0 +1,18 @@
+{
+  "kind": "customsearch#search",
+  "items": [
+    {
+      "title": "Rust Programming Language",
+      "link": "https://rust-lang.org/",
+      "snippet": "A language empowering everyone to build reliable and efficient software."
+    },
+    {
+      "title": "Documentation",
+      "link": "https://doc.rust-lang.org/",
+      "snippet": "API documentation."
+    },
+    {
+      "title": "No link here"
+    }
+  ]
+}

@@ -1,0 +1,35 @@
+[package]
+name = "dobukasu-core"
+description = "Core types, plug-in registry, rank fusion and the HTTP API for dobukasu."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+authors.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+async-trait = "0.1.92"
+axum = { version = "0.8.9", features = ["json", "query", "macros"] }
+futures = "0.3.34"
+http = "1.5.0"
+inventory = "0.3.25"
+reqwest = { version = "0.13.5", default-features = false, features = ["rustls", "http2", "charset", "gzip", "brotli", "json"] }
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.154"
+thiserror = "2.0.21"
+tokio = { version = "1.54.1", features = ["rt-multi-thread", "macros", "net", "signal", "time"] }
+toml = "1.2.0"
+tracing = "0.1.44"
+url = "2.5.8"
+
+[dev-dependencies]
+http-body-util = "0.1.5"
+serde_json = "1.0.154"
+tokio = { version = "1.54.1", features = ["rt-multi-thread", "macros", "time"] }
+tower = { version = "0.5.3", features = ["util"] }
+url = "2.5.8"
