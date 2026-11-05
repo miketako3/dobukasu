@@ -75,6 +75,48 @@ fn the_best_ranked_occurrence_supplies_the_title() {
 }
 
 #[test]
+fn a_page_a_later_engine_ranks_higher_keeps_that_engines_title() {
+    let merged = fuse(
+        &[
+            EngineHits::new(
+                "a",
+                vec![
+                    Hit::new("a first", "https://e.test/1", ""),
+                    Hit::new("a second", "https://e.test/2", ""),
+                    Hit::new("deep from a", "https://e.test/x", ""),
+                ],
+            ),
+            EngineHits::new("b", vec![Hit::new("top from b", "https://e.test/x", "")]),
+        ],
+        10,
+        true,
+    );
+
+    let shared = merged
+        .iter()
+        .find(|hit| hit.url == "https://e.test/x")
+        .expect("shared page");
+
+    assert_eq!(shared.title, "top from b");
+    assert_eq!(shared.engines, vec!["a".to_owned(), "b".to_owned()]);
+}
+
+#[test]
+fn a_tie_keeps_the_earlier_engines_spelling() {
+    let merged = fuse(
+        &[
+            EngineHits::new("a", vec![Hit::new("from a", "https://e.test/x", "")]),
+            EngineHits::new("b", vec![Hit::new("from b", "https://e.test/x", "")]),
+        ],
+        10,
+        true,
+    );
+
+    assert_eq!(merged.len(), 1);
+    assert_eq!(merged[0].title, "from a");
+}
+
+#[test]
 fn a_missing_snippet_is_filled_from_another_engine() {
     let merged = fuse(
         &[

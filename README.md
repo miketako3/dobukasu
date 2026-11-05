@@ -10,6 +10,9 @@ around an everything-is-a-plugin core.
 
 [日本語](README.ja.md)
 
+[![CI](https://github.com/miketako3/dobukasu/actions/workflows/ci.yml/badge.svg)](https://github.com/miketako3/dobukasu/actions/workflows/ci.yml) [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+
+
 ```
 $ curl -s 'http://127.0.0.1:8080/search?q=rust+async+runtime&limit=2' | jq
 {

@@ -103,10 +103,10 @@ pub fn fuse(sources: &[EngineHits], limit: usize, dedup: bool) -> Vec<SearchResu
                 if !entry.engines.iter().any(|known| known == &source.engine) {
                     entry.engines.push(source.engine.clone());
                 }
-                let better_rank = rank < entry.best_rank;
-                let same_rank_earlier_engine =
-                    rank == entry.best_rank && engine_index < entry.best_engine;
-                if better_rank || same_rank_earlier_engine {
+                // Engines are visited in order, so `best_engine` can never be
+                // larger than the engine being visited now; a tie therefore
+                // keeps the earlier engine's spelling of the page.
+                if rank < entry.best_rank {
                     entry.url.clone_from(&hit.url);
                     entry.title.clone_from(&hit.title);
                     entry.snippet.clone_from(&hit.snippet);

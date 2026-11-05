@@ -6,6 +6,9 @@ AI エージェントのための最小限のメタ検索 HTTP API。JSON を投
 
 [English](README.md)
 
+[![CI](https://github.com/miketako3/dobukasu/actions/workflows/ci.yml/badge.svg)](https://github.com/miketako3/dobukasu/actions/workflows/ci.yml) [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+
+
 ```
 $ curl -s 'http://127.0.0.1:8080/search?q=rust+async+runtime&limit=2' | jq
 {

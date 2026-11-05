@@ -68,3 +68,24 @@ being covered with a contrived test.
 
 The scheduled workflow in `.github/workflows/mutants.yml` runs the same gate
 weekly and on demand.
+
+## What the gate has actually found
+
+The first scoped run over the fusion module (25 mutants, `rank_fusion` and
+`url_identity` only) caught 24 and left one unviable. Before that, an earlier
+run of the same module reported eight survivors, all in the "which occurrence
+supplies the title" rule:
+
+- a page a later engine ranks higher did not take that engine's title, and
+- the tie-break between two engines at the same rank was not pinned at all.
+
+Fixing it showed the tie-break's second clause was dead code: engines are
+visited in order, so `best_engine` can never exceed the current engine index.
+The clause was removed and the two behaviours are now asserted directly
+(`a_page_a_later_engine_ranks_higher_keeps_that_engines_title`,
+`a_tie_keeps_the_earlier_engines_spelling`).
+
+A separate survivor in `canonical_url` (the `path.len() > 1` guard before
+trimming a trailing slash) turned out to be an equivalent mutant, because the
+URL serialiser normalises an empty path back to `/`. The guard was replaced
+with `strip_suffix('/')` so no unobservable branch remains.
