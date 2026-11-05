@@ -40,16 +40,6 @@ impl AppState {
             http,
         }
     }
-
-    #[must_use]
-    pub fn registry(&self) -> &Registry {
-        &self.registry
-    }
-
-    #[must_use]
-    pub fn config(&self) -> &Config {
-        &self.config
-    }
 }
 
 pub fn router(state: AppState) -> Router {
@@ -261,14 +251,16 @@ fn build_request(state: &AppState, params: &SearchParams) -> Result<RequestPlan,
         Some(value) => parse_usize("limit", &value.text())?,
         None => state.config.search.limit,
     }
-    .clamp(1, max_limit);
+    .clamp(1, max_limit.max(1));
 
     let requested = params.engines.as_ref().map(|value| {
+        let mut seen = std::collections::HashSet::new();
         value
             .text()
             .split(',')
             .map(str::trim)
             .filter(|id| !id.is_empty())
+            .filter(|id| seen.insert((*id).to_owned()))
             .map(ToOwned::to_owned)
             .collect::<Vec<_>>()
     });

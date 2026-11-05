@@ -133,6 +133,10 @@ impl Registry {
             }
         };
 
+        if ids.is_empty() {
+            return Err(DobukasuError::NoEngineEnabled);
+        }
+
         let mut engines = Vec::with_capacity(ids.len());
         for id in ids {
             match self.get(id) {

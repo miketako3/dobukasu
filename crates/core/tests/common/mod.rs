@@ -54,6 +54,13 @@ impl Engine for Stub {
                     .append_pair("limit", &query.limit.to_string())
                     .append_pair("safe", &query.safe_search.to_string())
                     .append_pair("lang", query.lang.as_deref().unwrap_or("none"))
+                    .append_pair(
+                        "range",
+                        &query.time_range.map_or_else(
+                            || "none".to_owned(),
+                            |range| format!("{range:?}").to_lowercase(),
+                        ),
+                    )
                     .finish();
                 Ok(vec![Hit::new(
                     "echo",

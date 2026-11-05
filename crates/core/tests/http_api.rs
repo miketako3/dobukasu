@@ -381,3 +381,102 @@ async fn an_empty_engine_list_is_rejected() {
     assert_eq!(status, 400);
     assert_eq!(body["error"]["code"], "invalid_request");
 }
+
+#[tokio::test]
+async fn a_repeated_engine_id_runs_once() {
+    let app = app(vec![stub("echo", Behaviour::Echo)], config());
+
+    let (_, body) = get(&app, "/search?q=rust&engines=echo,echo&dedup=false").await;
+
+    assert_eq!(urls(&body).len(), 1);
+    assert_eq!(body["engines"].as_array().map(Vec::len), Some(1));
+}
+
+#[tokio::test]
+async fn a_broken_max_limit_does_not_panic() {
+    let mut config = config();
+    config.search.max_limit = 0;
+    let app = app(
+        vec![stub(
+            "search-a",
+            Behaviour::Return(hits("a", &["https://e.test/1", "https://e.test/2"])),
+        )],
+        config,
+    );
+
+    let (status, body) = get(&app, "/search?q=rust&limit=5").await;
+
+    assert_eq!(status, 200);
+    assert_eq!(urls(&body).len(), 1);
+}
+
+#[tokio::test]
+async fn the_query_length_boundary_is_exact() {
+    let app = app(vec![stub("echo", Behaviour::Echo)], config());
+
+    let accepted = "a".repeat(1024);
+    let (status, _) = get(&app, &format!("/search?q={accepted}")).await;
+    assert_eq!(status, 200);
+
+    let rejected = "a".repeat(1025);
+    let (status, body) = get(&app, &format!("/search?q={rejected}")).await;
+    assert_eq!(status, 400);
+    assert_eq!(body["error"]["code"], "invalid_request");
+}
+
+#[tokio::test]
+async fn a_non_numeric_timeout_is_rejected() {
+    let app = app(vec![stub("echo", Behaviour::Echo)], config());
+
+    let (status, body) = get(&app, "/search?q=rust&timeout_ms=soon").await;
+
+    assert_eq!(status, 400);
+    assert_eq!(body["error"]["code"], "invalid_request");
+}
+
+#[tokio::test]
+async fn every_time_range_is_accepted_and_forwarded() {
+    let app = app(vec![stub("echo", Behaviour::Echo)], config());
+
+    for range in ["day", "week", "month", "year"] {
+        let (status, body) = get(&app, &format!("/search?q=rust&time_range={range}")).await;
+        assert_eq!(status, 200, "time_range={range}");
+        let url = body["results"][0]["url"].as_str().expect("echo url");
+        assert!(url.contains(&format!("range={range}")), "{url}");
+    }
+}
+
+#[tokio::test]
+async fn an_unknown_time_range_is_rejected() {
+    let app = app(vec![stub("echo", Behaviour::Echo)], config());
+
+    let (status, body) = get(&app, "/search?q=rust&time_range=decade").await;
+
+    assert_eq!(status, 400);
+    assert_eq!(body["error"]["code"], "invalid_request");
+}
+
+#[tokio::test]
+async fn the_index_describes_the_endpoints() {
+    let app = app(vec![stub("echo", Behaviour::Echo)], config());
+
+    let (status, body) = get(&app, "/").await;
+
+    assert_eq!(status, 200);
+    assert_eq!(body["name"], "dobukasu");
+    assert!(
+        body["endpoints"]
+            .as_array()
+            .is_some_and(|endpoints| endpoints.iter().any(|value| value == "GET /search"))
+    );
+}
+
+#[tokio::test]
+async fn a_registry_without_engines_cannot_serve() {
+    let app = app(Vec::new(), config());
+
+    let (status, body) = get(&app, "/search?q=rust").await;
+
+    assert_eq!(status, 500);
+    assert_eq!(body["error"]["code"], "no_engine_enabled");
+}

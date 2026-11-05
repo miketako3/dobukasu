@@ -15,23 +15,12 @@ const HTML_ACCEPT: &str = "text/html,application/xhtml+xml,application/xml;q=0.9
 
 /// Everything an engine needs from the host: one shared HTTP client and the
 /// request-scoped knobs.
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct EngineContext {
     http: reqwest::Client,
     timeout: Duration,
     user_agent: String,
     accept_language: Option<String>,
-}
-
-impl std::fmt::Debug for EngineContext {
-    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        formatter
-            .debug_struct("EngineContext")
-            .field("timeout", &self.timeout)
-            .field("user_agent", &self.user_agent)
-            .field("accept_language", &self.accept_language)
-            .finish_non_exhaustive()
-    }
 }
 
 impl EngineContext {
@@ -48,11 +37,6 @@ impl EngineContext {
             user_agent: user_agent.into(),
             accept_language,
         }
-    }
-
-    #[must_use]
-    pub fn timeout(&self) -> Duration {
-        self.timeout
     }
 
     pub fn request(&self, url: Url) -> reqwest::RequestBuilder {
@@ -100,10 +84,6 @@ fn transport(error: &reqwest::Error) -> EngineError {
 pub trait Engine: Send + Sync + 'static {
     fn id(&self) -> &'static str;
 
-    fn label(&self) -> &'static str {
-        self.id()
-    }
-
     async fn search(
         &self,
         query: &SearchQuery,
@@ -131,23 +111,6 @@ impl PluginOptions {
     #[must_use]
     pub fn string_or(&self, key: &str, fallback: &str) -> String {
         self.string(key).unwrap_or(fallback).to_owned()
-    }
-
-    #[must_use]
-    pub fn bool_or(&self, key: &str, fallback: bool) -> bool {
-        self.values
-            .get(key)
-            .and_then(toml::Value::as_bool)
-            .unwrap_or(fallback)
-    }
-
-    #[must_use]
-    pub fn u64_or(&self, key: &str, fallback: u64) -> u64 {
-        self.values
-            .get(key)
-            .and_then(toml::Value::as_integer)
-            .and_then(|value| u64::try_from(value).ok())
-            .unwrap_or(fallback)
     }
 }
 

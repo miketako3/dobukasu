@@ -126,3 +126,52 @@ fn a_limit_above_the_cap_or_zero_is_rejected() {
     config.search.timeout_ms = 0;
     assert!(config.validate().is_err());
 }
+
+#[test]
+fn an_explicit_path_is_read_and_validated() {
+    let directory = std::env::temp_dir().join(format!("dobukasu-config-{}", std::process::id()));
+    std::fs::create_dir_all(&directory).expect("temp dir");
+    let path = directory.join("dobukasu.toml");
+    std::fs::write(
+        &path,
+        "[server]\nbind = \"127.0.0.1:8555\"\n[search]\nlimit = 3\n",
+    )
+    .expect("write config");
+
+    let config = Config::load(Some(&path)).expect("loads");
+
+    assert_eq!(config.server.bind, "127.0.0.1:8555");
+    assert_eq!(config.search.limit, 3);
+
+    std::fs::remove_file(&path).expect("cleanup");
+    std::fs::remove_dir(&directory).expect("cleanup");
+}
+
+#[test]
+fn a_missing_path_is_a_configuration_error() {
+    let path = std::env::temp_dir().join("dobukasu-does-not-exist.toml");
+
+    let error = Config::load(Some(&path)).expect_err("must not load");
+
+    assert!(error.to_string().contains("cannot read"), "{error}");
+}
+
+#[test]
+fn a_cap_equal_to_the_limit_is_accepted() {
+    let mut config = Config::default();
+    config.search.limit = 5;
+    config.search.max_limit = 5;
+
+    assert!(config.validate().is_ok());
+}
+
+#[test]
+fn engine_options_expose_configured_and_default_values() {
+    let config = Config::from_toml("[engines.google]\nmode = \"cse\"\napi_key = \"k\"\n")
+        .expect("valid config");
+    let options = config.engine_options("google");
+
+    assert_eq!(options.string_or("mode", "auto"), "cse");
+    assert_eq!(options.string_or("cx", "none"), "none");
+    assert_eq!(options.string("api_key"), Some("k"));
+}
