@@ -281,7 +281,8 @@ cargo mutants -p dobukasu-core
 
 Mutation testing is the quality gate for weak assertions: a surviving mutant on
 URL canonicalisation or fusion scoring means the suite is not actually pinning
-the behaviour it claims to.
+the behaviour it claims to. The reasoning behind the suite's shape is written
+down in [docs/testing.md](docs/testing.md).
 
 ## Known limits
 
