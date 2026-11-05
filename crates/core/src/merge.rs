@@ -36,8 +36,8 @@ pub fn canonical_url(raw: &str) -> String {
     url.set_fragment(None);
 
     let path = url.path().to_owned();
-    if path.len() > 1 && path.ends_with('/') {
-        url.set_path(&path[..path.len() - 1]);
+    if let Some(trimmed_path) = path.strip_suffix('/') {
+        url.set_path(trimmed_path);
     }
 
     let mut pairs: Vec<(String, String)> = url

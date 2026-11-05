@@ -3,7 +3,7 @@
 //! `results.html` is a captured SERP for "rust programming language";
 //! `throttled.html` is the block page `DuckDuckGo` serves when it rate-limits.
 
-use dobukasu_engine_duckduckgo::parse;
+use dobukasu_engine_duckduckgo::{is_throttled, parse};
 use std::path::Path;
 
 fn fixture(name: &str) -> String {
@@ -97,4 +97,10 @@ fn results_without_a_link_are_dropped() {
 
     assert_eq!(hits.len(), 1);
     assert_eq!(hits[0].url, "https://example.test/");
+}
+
+#[test]
+fn the_throttle_page_is_recognised_as_a_challenge_not_as_no_results() {
+    assert!(is_throttled(&fixture("throttled.html")));
+    assert!(!is_throttled(&fixture("results.html")));
 }

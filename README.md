@@ -164,9 +164,9 @@ it off:
 enabled = false
 ```
 
-DuckDuckGo rate-limits bursts. When it does, it returns a block page with
-status 202; the plug-in reports an empty result set, and `engines[]` shows
-`count: 0` rather than inventing results.
+DuckDuckGo rate-limits bursts. When it does, it answers 202 with a challenge
+page; the plug-in recognises that page and reports `status: "error"` with a
+`Blocked` message instead of pretending the query had no hits.
 
 ## Configuration
 

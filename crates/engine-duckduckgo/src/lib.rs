@@ -60,6 +60,11 @@ impl Engine for DuckDuckGo {
         }
 
         let html = context.fetch_text(url).await?;
+        if is_throttled(&html) {
+            return Err(EngineError::Blocked(
+                "DuckDuckGo rate-limited this client (anomaly challenge)".to_owned(),
+            ));
+        }
         Ok(parse(&html))
     }
 }
@@ -71,6 +76,14 @@ fn region_code(query: &SearchQuery) -> Option<String> {
         |lang| lang.split('-').next().unwrap_or(lang).to_ascii_lowercase(),
     );
     Some(format!("{region}-{language}"))
+}
+
+/// Whether this page is the challenge `DuckDuckGo` serves when it rate-limits
+/// a client. Reported as a failure rather than an empty result set, because
+/// "no hits" and "we were turned away" are different answers.
+#[must_use]
+pub fn is_throttled(html: &str) -> bool {
+    html.contains("anomaly-modal") || html.contains("bots use DuckDuckGo too")
 }
 
 /// Parse a `DuckDuckGo` HTML results page. Public because it is the engine's
