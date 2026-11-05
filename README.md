@@ -105,7 +105,7 @@ That is the whole integration. No MCP server, no tool schema to keep in sync.
 
 | id | keyless | how |
 | --- | --- | --- |
-| `bing` | yes | scrapes `bing.com/search`; decodes `ck/a` redirects |
+| `bing` | yes | scrapes `bing.com/search`, naming the market (`setlang`, `cc`) so Bing answers instead of serving a decoy page; decodes `ck/a` redirects |
 | `duckduckgo` | yes | scrapes `html.duckduckgo.com`; decodes `uddg` redirects |
 | `google` | partly | scrapes `www.google.com/wml/search` with Symbian Nokia user agents — the trick SearXNG uses to get a JavaScript-free layout — and switches to the Custom Search JSON API when `GOOGLE_API_KEY` and `GOOGLE_CX` are set |
 
@@ -206,8 +206,10 @@ cargo mutants --workspace
 ## Known limits
 
 - **Scraped engines are best effort.** Under bot mitigation, Bing sometimes
-  answers `200` with unrelated pages instead of an error. `dobukasu` reports
-  what the upstream returned; it cannot judge relevance from the markup.
+  answers `200` with a decoy SERP of unrelated pages, and Google may refuse the
+  host outright. `dobukasu` reports what the upstream returned and flags
+  refusals, but it cannot judge relevance from the markup. If the results look
+  wrong, that is the upstream talking, not the query.
 - **No pagination.** One page per engine. Reformulate the query instead.
 - **No caching.** Every invocation fans out; wrap it if you call it in a loop.
 - **No server.** Three engines per query, then exit. That is deliberate.

@@ -32,7 +32,7 @@ pub async fn search(
         let context = EngineContext::new(
             client.clone(),
             timeout,
-            DEFAULT_USER_AGENT,
+            engine.user_agent().unwrap_or(DEFAULT_USER_AGENT),
             language.clone(),
         );
         async move {

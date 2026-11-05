@@ -99,6 +99,14 @@ fn transport(error: &reqwest::Error) -> EngineError {
 pub trait Engine: Send + Sync + 'static {
     fn id(&self) -> &'static str;
 
+    /// User agent this upstream answers best. `None` uses the shared default.
+    ///
+    /// Some engines want a browser-like string, others serve their real
+    /// results only to clients that admit to being a program.
+    fn user_agent(&self) -> Option<&'static str> {
+        None
+    }
+
     async fn search(
         &self,
         query: &SearchQuery,

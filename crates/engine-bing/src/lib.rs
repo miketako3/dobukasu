@@ -35,6 +35,12 @@ impl Engine for Bing {
         ID
     }
 
+    /// Bing answers a browser-shaped string with a decoy SERP when the
+    /// request does not carry a browser's TLS session, so say what we are.
+    fn user_agent(&self) -> Option<&'static str> {
+        Some("dobukasu/0.1.0 (+https://github.com/miketako3/dobukasu)")
+    }
+
     async fn search(
         &self,
         query: &SearchQuery,
@@ -46,12 +52,11 @@ impl Engine for Bing {
             let mut pairs = url.query_pairs_mut();
             pairs.append_pair("q", &query.text);
             pairs.append_pair("count", &query.limit.to_string());
-            if let Some(language) = query.lang.as_deref() {
-                pairs.append_pair("setlang", language);
-            }
-            if let Some(region) = query.region.as_deref() {
-                pairs.append_pair("cc", region);
-            }
+            // Without an explicit market, Bing answers clients it does not
+            // trust with a decoy SERP of unrelated pages instead of an empty
+            // one. Naming the market is what makes the answer real.
+            pairs.append_pair("setlang", query.lang.as_deref().unwrap_or("en"));
+            pairs.append_pair("cc", query.region.as_deref().unwrap_or("us"));
             pairs.append_pair("adlt", if query.safe_search { "strict" } else { "off" });
             if let Some(range) = query.time_range {
                 let filter = match range {
