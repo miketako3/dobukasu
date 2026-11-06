@@ -108,8 +108,18 @@ That is the whole integration. No MCP server, no tool schema to keep in sync.
 | `bing` | yes | scrapes `bing.com/search`, naming the market (`setlang`, `cc`) so Bing answers instead of serving a decoy page; decodes `ck/a` redirects |
 | `duckduckgo` | yes | scrapes `html.duckduckgo.com`; decodes `uddg` redirects |
 | `google` | partly | scrapes `www.google.com/wml/search` with Symbian Nokia user agents — the trick SearXNG uses to get a JavaScript-free layout — and switches to the Custom Search JSON API when `GOOGLE_API_KEY` and `GOOGLE_CX` are set |
+| `brave` | no | official Brave Search JSON API (`BRAVE_API_KEY`, free tier). Its own index, no scraping, same behaviour from any IP |
 
-All three are compiled in and enabled by default.
+All four are compiled in. The three keyless ones are always on; `brave` joins
+the default set as soon as `BRAVE_API_KEY` exists, because its index is the one
+answer that does not depend on an upstream's goodwill.
+
+```sh
+dobukasu engines        # lists what is usable, plus anything unusable and why
+```
+
+A key that is missing does not break anything: the engine is left out of the
+registry and reported under `unavailable`, and asking for it by name says why.
 
 **About Google.** The ordinary `/search` endpoint now answers automated clients
 with a JavaScript interstitial or a 403, which is why scraping it directly
@@ -175,6 +185,7 @@ use dobukasu_engine_example as _;
 ```
 crates/core             Engine trait, compile-time registry, rank fusion, runner
 crates/engine-bing      one plug-in each
+crates/engine-brave
 crates/engine-duckduckgo
 crates/engine-google
 crates/cli              the `dobukasu` binary: links every bundled plug-in
@@ -205,6 +216,8 @@ cargo mutants --workspace
 
 ## Known limits
 
+- **Brave needs a key.** Without `BRAVE_API_KEY` the only engines left are the
+  scraped ones, and those are subject to the caveats below.
 - **Scraped engines are best effort.** Under bot mitigation, Bing sometimes
   answers `200` with a decoy SERP of unrelated pages, and Google may refuse the
   host outright. `dobukasu` reports what the upstream returned and flags

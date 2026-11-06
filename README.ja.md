@@ -93,8 +93,15 @@ cp -r skills/dobukasu ~/.agents/skills/
 | `bing` | はい | `bing.com/search` を解析。市場（`setlang`、`cc`）を明示しないと Bing が無関係なページを返すため、常に指定する。`ck/a` リダイレクトを復号する |
 | `duckduckgo` | はい | `html.duckduckgo.com` を解析。`uddg` リダイレクトを復号する |
 | `google` | 一部 | Symbian の Nokia ユーザーエージェントで `www.google.com/wml/search` を解析する。これは SearXNG が使っている、JavaScript なしのレイアウトを引き出す手法。`GOOGLE_API_KEY` と `GOOGLE_CX` があれば Custom Search JSON API に切り替える |
+| `brave` | いいえ | Brave Search の公式 JSON API（`BRAVE_API_KEY`、無料枠あり）。自前のインデックスで、スクレイピングをしない。どの IP からでも同じように動く |
 
-3 つともビルドに含まれ、既定で有効。
+4 つともビルドに含まれる。キーが要らない 3 つは常に有効で、`brave` は `BRAVE_API_KEY` があるときだけ既定の検索対象に加わる。上流の機嫌に左右されない答えを持っているのは Brave のインデックスだけなので、キーがあるならそれが一番確実。
+
+```sh
+dobukasu engines        # 使えるものと、使えないものと、その理由
+```
+
+キーが無くても壊れない。エンジンはレジストリから外れ、`unavailable` として理由付きで報告される。名前を指定して呼べば、なぜ使えないかを返す。
 
 **Google について。** 通常の `/search` は、自動クライアントには JavaScript 必須の画面か 403 を返す。だから直接叩くと失敗する。`/wml/search` は、ごく古い携帯のユーザーエージェントにだけ Google が返しているレイアウトで、現在の SearXNG もこれを解析している。ただしこれもスクレイピングであることに変わりはない。Google がこのホストを拒否したら、エンジンは空の一覧を返さず、`blocked` とその理由を報告する。Google の機嫌に依存しない契約が欲しいなら、無料の Custom Search キーを `GOOGLE_API_KEY` と `GOOGLE_CX` に入れる。
 
@@ -148,6 +155,7 @@ use dobukasu_engine_example as _;
 ```
 crates/core             Engine trait、コンパイル時レジストリ、順位統合、実行部
 crates/engine-bing      エンジンはそれぞれ 1 クレート
+crates/engine-brave
 crates/engine-duckduckgo
 crates/engine-google
 crates/cli              `dobukasu` バイナリ。同梱プラグインを全部リンクする
@@ -173,6 +181,7 @@ cargo mutants --workspace
 
 ## 既知の限界
 
+- **Brave にはキーが要る。** `BRAVE_API_KEY` が無いと残るのはスクレイピングするエンジンだけで、下に書く制約を受ける。
 - **スクレイピングするエンジンはベストエフォート。** ボット対策が効いていると、Bing はエラーではなく無関係なページを `200` で返すことがあり、Google はホスト自体を拒否することがある。dobukasu は上流が返したものをそのまま報告し、拒否は拒否として伝えるが、マークアップから関連性は判断できない。結果がおかしいときは、クエリではなく上流がそう返している。
 - **ページングはない。** エンジンごとに 1 ページだけ。続きが欲しいときはクエリを言い換える。
 - **キャッシュはない。** 実行のたびに毎回問い合わせる。ループで叩くなら手前にキャッシュを置く。

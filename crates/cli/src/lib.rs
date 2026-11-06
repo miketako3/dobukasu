@@ -129,8 +129,16 @@ struct EngineEntry {
 }
 
 #[derive(Serialize)]
+struct UnavailableEntry {
+    id: &'static str,
+    reason: String,
+}
+
+#[derive(Serialize)]
 struct EngineList {
     engines: Vec<EngineEntry>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    unavailable: Vec<UnavailableEntry>,
 }
 
 fn engines_json(registry: &Registry) -> String {
@@ -147,8 +155,19 @@ fn engines_json(registry: &Registry) -> String {
             }
         })
         .collect();
-    let mut text = serde_json::to_string_pretty(&EngineList { engines })
-        .unwrap_or_else(|_| "{\"engines\":[]}".to_owned());
+    let unavailable = registry
+        .unavailable()
+        .iter()
+        .map(|(id, reason)| UnavailableEntry {
+            id,
+            reason: reason.clone(),
+        })
+        .collect();
+    let mut text = serde_json::to_string_pretty(&EngineList {
+        engines,
+        unavailable,
+    })
+    .unwrap_or_else(|_| "{\"engines\":[]}".to_owned());
     text.push('\n');
     text
 }

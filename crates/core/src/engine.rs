@@ -65,19 +65,25 @@ impl EngineContext {
     /// only serve their plain layout to particular clients (Google and its
     /// Nokia mobile agents).
     pub async fn fetch_text_as(&self, url: Url, user_agent: &str) -> Result<String, EngineError> {
-        let response = self
-            .request_as(url, user_agent)
-            .send()
-            .await
-            .map_err(|error| transport(&error))?;
+        self.fetch(self.request_as(url, user_agent)).await
+    }
+
+    /// Send a request the engine built itself — JSON APIs need their own
+    /// `Accept` header and auth — and map the answer onto [`EngineError`].
+    pub async fn fetch(&self, request: reqwest::RequestBuilder) -> Result<String, EngineError> {
+        let response = request.send().await.map_err(|error| transport(&error))?;
         let status = response.status();
         if status == reqwest::StatusCode::TOO_MANY_REQUESTS {
             return Err(EngineError::Blocked("rate limited".to_owned()));
         }
-        if status == reqwest::StatusCode::FORBIDDEN {
-            return Err(EngineError::Blocked(
-                "upstream answered 403 for this client".to_owned(),
-            ));
+        if matches!(
+            status,
+            reqwest::StatusCode::UNAUTHORIZED | reqwest::StatusCode::FORBIDDEN
+        ) {
+            return Err(EngineError::Blocked(format!(
+                "upstream refused this client ({})",
+                status.as_u16()
+            )));
         }
         if !status.is_success() {
             return Err(EngineError::Status(status.as_u16()));

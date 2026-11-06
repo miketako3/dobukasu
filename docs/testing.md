@@ -17,7 +17,8 @@ passing for as long as the product keeps that promise.
 | Rank fusion | `crates/core/tests/rank_fusion.rs` | Ordering, de-duplication, truncation, the RRF score. |
 | Runner | `crates/core/tests/search.rs` | Partial failure, timeouts, the all-failed flag, limit, cross-engine merging. |
 | HTTP adapter | `crates/core/tests/fetch.rs` | How an upstream status becomes an `EngineError`. |
-| Upstream HTML | `crates/*/tests/contract.rs` | `&str -> Vec<Hit>` for captured pages. |
+| Upstream pages | `crates/*/tests/contract.rs` | `&str -> Vec<Hit>` for captured pages and API payloads. |
+| Plug-in selection | `crates/core/tests/registry.rs` | Which plug-ins load, and what an unusable one reports. |
 | CLI contract | `crates/cli/tests/cli.rs` | Arguments, JSON on stdout, stderr, exit codes. |
 | Arguments | `crates/cli/src/lib.rs` (`mod tests`) | Parsing rules the binary relies on. |
 
@@ -41,6 +42,8 @@ the CLI tests build a `Cli` from stub engines and read its `Output`.
   DuckDuckGo serves when it rate-limits a client.
 - `crates/engine-google/tests/fixtures/blocked.html` — the real JavaScript
   interstitial.
+- `crates/engine-brave/tests/fixtures/results.json` — a Brave API payload,
+  including the HTML Brave puts inside titles and snippets.
 - `crates/engine-google/tests/fixtures/wml.html` — a shape fixture: Google
   answers this host with 403 or a JavaScript interstitial instead of results,
   so this file reproduces the `/wml/search` layout the backend targets.
