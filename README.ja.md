@@ -1,10 +1,10 @@
 # dobukasu
 
-**一つ問えば、全エンジンが答える。**
+**SearXNG の仕組みを、エージェント前提・プラグイン優先・最小構成で Rust に作り直した。**
 
 [![CI](https://github.com/miketako3/dobukasu/actions/workflows/ci.yml/badge.svg)](https://github.com/miketako3/dobukasu/actions/workflows/ci.yml) [![Release](https://img.shields.io/github/v/release/miketako3/dobukasu)](https://github.com/miketako3/dobukasu/releases/latest) [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-`dobukasu` は AI エージェントのためのメタ検索コマンド。クエリを複数の検索エンジンに同時に投げ、順位を一つに統合し、JSON で出力する。サーバも UI もアカウントもキーも要らない。
+SearXNG がやっていること——複数の検索エンジンに同時に問い合わせ、順位を統合する——を、制約を三つに絞って作り直した。**エージェント前提**（サービスではなく、JSON を出して終了するコマンド）、**プラグイン優先**（コアはエンジン名を一つも知らず、各エンジンは自分を登録するクレート）、**最小構成**（UI もカテゴリも設定画面もデータベースも持たない）。クエリを一つ渡すと、統合された一覧が返る。アカウントもキーもサーバも要らない。
 
 [English](README.md)
 
@@ -82,9 +82,9 @@ cp -r skills/dobukasu ~/.agents/skills/
 
 MCP サーバも、同期し続けるスキーマも要らない。JSON を出して終了するプロセスが一つあるだけ。
 
-## SearXNG ではだめなのか
+## 作り直して何が変わったか
 
-SearXNG はよくできている。これはその考え方から表面を削ったもので、残ったのはエージェントが実際に呼ぶ部分だけ。一回の呼び出し、統合された一つの順位、エンジンごとの正直な報告。
+SearXNG はよくできていて、ここで借りているのは思想であって画面ではない。呼び出し手が人間ではなくエージェントになったとき、効いてくる違いはこの四点。
 
 - **サーバが要らない。** 起動も監視も要塞化も不要。実行は毎回独立していて、固まった検索が次の検索を壊さない。
 - **足し算ではなく順位統合。** Reciprocal Rank Fusion なので、2 エンジンが一致して上位に出すページは、1 エンジンで 1 位のページより上に来る。

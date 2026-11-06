@@ -1,12 +1,15 @@
 # dobukasu
 
-**One query. Every engine. One answer.**
+**SearXNG's architecture, rebuilt for agents: agent-native, plugin-first, minimal — in Rust.**
 
 [![CI](https://github.com/miketako3/dobukasu/actions/workflows/ci.yml/badge.svg)](https://github.com/miketako3/dobukasu/actions/workflows/ci.yml) [![Release](https://img.shields.io/github/v/release/miketako3/dobukasu)](https://github.com/miketako3/dobukasu/releases/latest) [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-`dobukasu` is a meta-search command for AI agents: it asks several search
-engines at once, fuses their rankings into a single list, and prints JSON. No
-server, no UI, no account, no key.
+`dobukasu` does what SearXNG does — ask several search engines at once and fuse
+their rankings — but rebuilt from the ground up with three constraints:
+**agent-native** (a command that prints JSON and exits, not a service),
+**plugin-first** (the core names no engine; every engine is a crate that
+registers itself), and **minimal** (no UI, no categories, no preferences, no
+database). One query in, one merged list out. No account, no key, no server.
 
 ```
 $ dobukasu "rust async runtime" --limit 3
@@ -94,11 +97,10 @@ cp -r skills/dobukasu ~/.agents/skills/
 
 No MCP server, no schema to keep in sync. A process that prints JSON and exits.
 
-## Why not just use SearXNG
+## What "rebuilt" changes
 
-SearXNG is excellent, and this is its idea with the surface cut away. What is
-left is the part an agent calls: one request, one merged ranking, an honest
-report of what each engine did.
+SearXNG is excellent and this borrows its architecture, not its surface. The
+differences that matter when the caller is an agent rather than a person:
 
 - **No server.** Nothing to start, watch, or secure. Each run is independent, so
   a wedged search cannot poison the next one.
