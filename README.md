@@ -1,5 +1,3 @@
-<img src="assets/banner.png" alt="dobukasu" width="100%">
-
 # dobukasu
 
 **One query. Every engine. One answer.**

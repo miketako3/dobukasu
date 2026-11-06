@@ -1,5 +1,3 @@
-<img src="assets/banner.png" alt="dobukasu" width="100%">
-
 # dobukasu
 
 **一つ問えば、全エンジンが答える。**
