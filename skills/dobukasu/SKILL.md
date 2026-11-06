@@ -92,23 +92,6 @@ the `score` already reflects that.
 - **Google needs credentials to be reliable.** Without `GOOGLE_API_KEY` and
   `GOOGLE_CX` it scrapes a JavaScript-free layout that Google often refuses.
   Its `error` line says so; it is not a bug in your query.
-- **Brave is the reliable engine when it is configured.** It needs
-  `BRAVE_API_KEY`; without one it does not appear in `engines`. If it is
-  listed, weight its results highest — no scraping, no decoy pages.
-
-## Which engine to trust
-
-`dobukasu engines` shows what this build can actually ask, plus an
-`unavailable` list explaining anything missing (usually a key that is not set).
-
-- `brave` — official API, own index. Trust it first when present.
-- `bing` — usually good; a decoy SERP of unrelated pages is possible.
-- `duckduckgo` — good until it throttles, then `blocked` for a while.
-- `google` — frequently `blocked` without Custom Search keys.
-
-When results look unrelated to the query, say so instead of passing them on:
-the upstream answered with a decoy page, and the honest report is "two engines
-were blocked and the third returned off-topic results", not a confident answer.
 
 ## If a search comes back empty
 

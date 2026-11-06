@@ -346,7 +346,6 @@ dependencies = [
  "async-trait",
  "dobukasu-core",
  "dobukasu-engine-bing",
- "dobukasu-engine-brave",
  "dobukasu-engine-duckduckgo",
  "dobukasu-engine-google",
  "reqwest",
@@ -382,20 +381,6 @@ dependencies = [
  "percent-encoding",
  "reqwest",
  "scraper",
- "url",
-]
-
-[[package]]
-name = "dobukasu-engine-brave"
-version = "0.1.0"
-dependencies = [
- "async-trait",
- "dobukasu-core",
- "inventory",
- "reqwest",
- "scraper",
- "serde",
- "serde_json",
  "url",
 ]
 

@@ -5,7 +5,6 @@ use std::process::ExitCode;
 // The engines register themselves at link time; without these the linker is
 // free to drop them and the binary would ship with no engines at all.
 use dobukasu_engine_bing as _;
-use dobukasu_engine_brave as _;
 use dobukasu_engine_duckduckgo as _;
 use dobukasu_engine_google as _;
 

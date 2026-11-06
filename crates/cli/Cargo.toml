@@ -19,7 +19,6 @@ path = "src/main.rs"
 [dependencies]
 dobukasu-core = { version = "0.1.0", path = "../core" }
 dobukasu-engine-bing = { version = "0.1.0", path = "../engine-bing" }
-dobukasu-engine-brave = { version = "0.1.0", path = "../engine-brave" }
 dobukasu-engine-duckduckgo = { version = "0.1.0", path = "../engine-duckduckgo" }
 dobukasu-engine-google = { version = "0.1.0", path = "../engine-google" }
 reqwest = { version = "0.13.5", default-features = false, features = ["rustls", "http2", "gzip", "brotli"] }
