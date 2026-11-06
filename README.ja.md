@@ -1,44 +1,65 @@
+<img src="assets/banner.png" alt="dobukasu" width="100%">
+
 # dobukasu
 
-AI エージェントのための最小限のメタ検索 CLI。クエリを一つ渡すと、統合された JSON の一覧が返る。
+**一つ問えば、全エンジンが答える。**
 
-[![CI](https://github.com/miketako3/dobukasu/actions/workflows/ci.yml/badge.svg)](https://github.com/miketako3/dobukasu/actions/workflows/ci.yml) [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![CI](https://github.com/miketako3/dobukasu/actions/workflows/ci.yml/badge.svg)](https://github.com/miketako3/dobukasu/actions/workflows/ci.yml) [![Release](https://img.shields.io/github/v/release/miketako3/dobukasu)](https://github.com/miketako3/dobukasu/releases/latest) [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-やることは一つ。クエリを受け取り、複数の検索エンジンに並行して問い合わせ、順位を一つに統合し、JSON として出力する。SearXNG のうちエージェントが実際に使う部分だけを取り出し、UI・カテゴリ・設定画面・サーバを削り、Rust で「全部プラグイン」の構成に組み直したもの。
+`dobukasu` は AI エージェントのためのメタ検索コマンド。クエリを複数の検索エンジンに同時に投げ、順位を一つに統合し、JSON で出力する。サーバも UI もアカウントもキーも要らない。
 
 [English](README.md)
 
 ```
-$ dobukasu "rust async runtime" --limit 2
+$ dobukasu "rust async runtime" --limit 3
 {
   "query": "rust async runtime",
   "results": [
     {
       "title": "The Async Ecosystem",
       "url": "https://rust-lang.github.io/async-book/",
-      "snippet": "An asynchronous runtime, or executor, …",
+      "snippet": "An asynchronous runtime, or executor, is responsible for …",
       "engines": ["bing", "duckduckgo"],
       "score": 0.03278688524590164
-    }
+    },
+    …
   ],
   "engines": [
-    {"id": "bing", "status": "ok", "count": 10, "duration_ms": 412},
-    {"id": "duckduckgo", "status": "ok", "count": 10, "duration_ms": 388},
-    {"id": "google", "status": "error", "count": 0, "duration_ms": 201,
+    {"id": "bing",       "status": "ok",    "count": 10, "duration_ms": 412},
+    {"id": "duckduckgo", "status": "ok",    "count": 10, "duration_ms": 388},
+    {"id": "google",     "status": "error", "count": 0,  "duration_ms": 201,
      "error": "upstream blocked this client: …"}
   ],
   "took_ms": 430
 }
 ```
 
-## API ではなく CLI にした理由
+## 名前の由来
 
-検索したいエージェントに必要なのは、呼び出し一回分と安定した契約であって、面倒を見続けるサービスではない。JSON を出して終了するプロセスは、考えうる最小の表面積になる。ポートも、起動と停止の管理も、認証も、質問と質問の間に残り続けるものもない。呼び出しは毎回独立しているので、一度固まった実行が次の実行を壊すこともない。
+禪院直哉。『呪術廻戦』で自他ともに認める「最速の呪術師」と呼ばれた男。彼の術式は一秒という時間を細かいコマに刻み、その一つひとつを辿ることで誰より速く動く。
 
-- **全部プラグイン。** コアはエンジン名を一つも知らない。各エンジンは独立したクレートで、コンパイル時のレジストリに自分を登録する。
-- **足し算ではなく順位統合。** Reciprocal Rank Fusion なので、2 エンジンが一致して上位に出すページは、1 エンジンで 1 位のページより上に来る。
-- **部分失敗が正常。** 一つのエンジンがブロックされてもタイムアウトしても、検索は失敗しない。`engines[]` に状態と理由が出る。
-- **テストはオフラインで回る。** パーサは捕捉したページで固定し、CLI の契約は本物の引数解析と出力を通して検証する。
+`dobukasu` がクエリに対してやることも同じだ。一つの問いを複数のエンジンに刻み、すべてを並行に走らせ、一つの答えに束ねる。単独のエンジンより速く、より多くの裏付けを持つ答えが出る。
+
+これはオマージュであって、作品との関係はない。漫画・作者・出版社とは一切関係がない。
+
+## 使い方
+
+```sh
+dobukasu "query"                    # 統合した結果を JSON で
+dobukasu "query" --limit 5          # 5 件に絞る
+dobukasu "query" --engines bing     # エンジンを指定する
+dobukasu "query" --timeout-ms 4000  # エンジンごとの制限時間
+dobukasu engines                    # このビルドが聞けるエンジン一覧
+```
+
+| フラグ | 既定値 | 意味 |
+| --- | --- | --- |
+| `--limit N` | `10` | 統合後に残す件数 |
+| `--engines a,b` | 無料のエンジン全部 | 指定したものだけに聞く |
+| `--timeout-ms N` | `8000` | エンジンごとの制限時間 |
+| `--no-dedup` | 無効 | 同じページをエンジンごとに残す |
+
+終了コードはエージェント向けに決めてある。誰か答えたら `0`、全滅したら `1`、使い方の誤りは `2`。エンジンの失敗は検索の失敗にしない。`engines[]` に状態と理由を出す。
 
 ## インストール
 
@@ -46,69 +67,49 @@ $ dobukasu "rust async runtime" --limit 2
 curl -fsSL https://raw.githubusercontent.com/miketako3/dobukasu/main/install.sh | sh
 ```
 
-macOS（arm64 / x86_64）と Linux（x86_64）のビルド済みバイナリを取ってきて `~/.local/bin` に置く。`DOBUKASU_INSTALL_DIR` で置き場所、`DOBUKASU_VERSION` でバージョンを指定できる。
+macOS（arm64 / x86_64）と Linux（x86_64）のビルド済みバイナリを取ってきて `~/.local/bin` に置く。`DOBUKASU_INSTALL_DIR` と `DOBUKASU_VERSION` で置き場所とバージョンを変えられる。
 
-ソースからビルドしたい場合:
-
-```sh
-cargo install --path crates/cli     # ~/.cargo/bin に dobukasu が入る
-```
-
-## 使い方
-
-```sh
-dobukasu "query"                          # 統合した結果
-dobukasu "query" --limit 5                # 5 件に絞る
-dobukasu "query" --engines bing           # Bing だけに聞く
-dobukasu "query" --timeout-ms 4000        # エンジンごとの制限時間
-dobukasu "query" --no-dedup               # 同じページをエンジンごとに残す
-dobukasu engines                          # このビルドが聞けるエンジン一覧
-dobukasu --help
-```
-
-| フラグ | 既定値 | 意味 |
-| --- | --- | --- |
-| `--limit N` | `10` | 統合後に残す件数 |
-| `--engines a,b` | 既定の全エンジン | 指定したものだけに聞く |
-| `--timeout-ms N` | `8000` | エンジンごとの制限時間 |
-| `--no-dedup` | 無効 | 同じページをエンジンごとに残す |
-
-出力は標準出力の JSON で、形は `{query, results[], engines[], took_ms}`。各結果は、それを返した `engines` と統合スコア `score` を持つ。
-
-| 終了コード | 意味 |
-| --- | --- |
-| `0` | 少なくとも 1 エンジンが答えた |
-| `1` | 全エンジンが失敗した |
-| `2` | 使い方の誤り（未知のフラグ、未知のエンジン、クエリなし） |
+ソースからビルドするなら `cargo install --path crates/cli`。
 
 ## エージェントスキルとして使う
 
-[`skills/dobukasu/SKILL.md`](skills/dobukasu/SKILL.md) がそのまま使えるスキルになっている。いつ検索するか、CLI をどう呼ぶか、`engines[]` をどう読むか、結果が空だったときに何をするかが書いてある。
+[`skills/dobukasu/SKILL.md`](skills/dobukasu/SKILL.md) がエージェント側の半分。いつ検索するか、`engines[]` をどう読むか、どのエンジンを信じるか、結果が空だったときに何をするかが書いてある。
 
 ```sh
 mkdir -p ~/.agents/skills
 cp -r skills/dobukasu ~/.agents/skills/
 ```
 
-統合はこれだけ。MCP サーバも、同期し続けるツール定義も要らない。
+MCP サーバも、同期し続けるスキーマも要らない。JSON を出して終了するプロセスが一つあるだけ。
+
+## SearXNG ではだめなのか
+
+SearXNG はよくできている。これはその考え方から表面を削ったもので、残ったのはエージェントが実際に呼ぶ部分だけ。一回の呼び出し、統合された一つの順位、エンジンごとの正直な報告。
+
+- **サーバが要らない。** 起動も監視も要塞化も不要。実行は毎回独立していて、固まった検索が次の検索を壊さない。
+- **足し算ではなく順位統合。** Reciprocal Rank Fusion なので、2 エンジンが一致して上位に出すページは、1 エンジンで 1 位のページより上に来る。
+- **失敗を正直に返す。** 「ブロックされた」「時間切れ」「ヒットなし」は別の答えで、`engines[]` がそれを区別する。空の一覧を返してごまかさない。
+- **全部プラグイン。** コアはエンジン名を一つも知らない。
 
 ## 同梱エンジン
 
 | id | キー不要 | 取得方法 |
 | --- | --- | --- |
 | `bing` | はい | `bing.com/search` を解析。市場（`setlang`、`cc`）を明示しないと Bing が無関係なページを返すため、常に指定する。`ck/a` リダイレクトを復号する |
-| `duckduckgo` | はい | `html.duckduckgo.com` を解析。`uddg` リダイレクトを復号する |
-| `google` | 一部 | Symbian の Nokia ユーザーエージェントで `www.google.com/wml/search` を解析する。これは SearXNG が使っている、JavaScript なしのレイアウトを引き出す手法。`GOOGLE_API_KEY` と `GOOGLE_CX` があれば Custom Search JSON API に切り替える |
+| `duckduckgo` | はい | `html.duckduckgo.com` を解析。レート制限のチャレンジページを見分けてブロックとして報告する。`uddg` リダイレクトを復号する |
+| `google` | はい\* | Symbian の Nokia ユーザーエージェントで `www.google.com/wml/search` を解析する。SearXNG が使っている JavaScript なしのレイアウト。`GOOGLE_API_KEY` と `GOOGLE_CX` があれば Custom Search JSON API に切り替える |
 
-3 つともビルドに含まれ、既定で有効。
+\* 理屈のうえではキー不要だが、Google は多くの回線をそもそも拒否する。そのときは空の一覧ではなく `blocked` と理由を返す。資格情報を入れるか、Google に拒否されていないホストで動かすのが対処になる。
 
-**Google について。** 通常の `/search` は、自動クライアントには JavaScript 必須の画面か 403 を返す。だから直接叩くと失敗する。`/wml/search` は、ごく古い携帯のユーザーエージェントにだけ Google が返しているレイアウトで、現在の SearXNG もこれを解析している。ただしこれもスクレイピングであることに変わりはない。Google がこのホストを拒否したら、エンジンは空の一覧を返さず、`blocked` とその理由を報告する。Google の機嫌に依存しない契約が欲しいなら、無料の Custom Search キーを `GOOGLE_API_KEY` と `GOOGLE_CX` に入れる。
+既定の検索対象は無料のエンジンだけ。アカウントが要るものは既定に入らず、設定したうえで `--engines` で名指しする。無料で動く道が常に確保される。
 
-**DuckDuckGo について。** 短時間の連打で制限をかけ、202 とチャレンジページを返す。そのページを見分けて `blocked` として報告する。「結果がゼロだった」と「門前払いされた」は別の答えなので、混ぜない。
+```sh
+dobukasu engines   # 使えるもの、既定かどうか、使えないものはその理由
+```
 
 ## エンジンを追加する
 
-エンジンはクレートにする。`Engine` を実装し、`inventory` で `Plugin` を登録し、バイナリにリンクする。コアはそのクレートを import しない。追加で触るファイルは 3 つだけ。
+エンジンはクレートにする。`Engine` を実装し、`inventory` で `Plugin` を登録する。コアはそのクレートを import しないので、追加で触るのはクレート、`crates/cli/Cargo.toml`、`crates/cli/src/main.rs` の 1 行の 3 か所だけ。
 
 ```rust
 pub const ID: &str = "example";
@@ -118,13 +119,9 @@ inventory::submit! {
         id: ID,
         label: "Example",
         description: "Keyless. Uses example.com/search.",
-        enabled_by_default: false,
+        enabled_by_default: true,
         build,
     }
-}
-
-fn build() -> Result<Arc<dyn Engine>, EngineError> {
-    Ok(Arc::new(Example))
 }
 
 #[async_trait]
@@ -134,8 +131,7 @@ impl Engine for Example {
     async fn search(&self, query: &SearchQuery, ctx: &EngineContext) -> Result<Vec<Hit>, EngineError> {
         let mut url = Url::parse("https://example.com/search")?;
         url.query_pairs_mut().append_pair("q", &query.text);
-        let html = ctx.fetch_text(url).await?;
-        Ok(parse(&html))
+        Ok(parse(&ctx.fetch_text(url).await?))
     }
 }
 
@@ -143,21 +139,9 @@ impl Engine for Example {
 pub fn parse(html: &str) -> Vec<Hit> { /* セレクタ */ }
 ```
 
-パーサは `&str -> Vec<Hit>` の純粋関数にしておく。これが上流 HTML との実際の契約であり、HTTP 周りのリファクタリングに影響されず、フィクスチャテストが叩く対象になる。
+`parse` は `&str -> Vec<Hit>` の純粋関数にしておく。これが上流との実際の契約であり、HTTP 周りをどう作り替えても生き残る。キーが要るエンジンは `enabled_by_default: false` にして、既定の検索を無料のまま保つ。リンクを忘れると静かに落ちるので、`crates/cli/tests/bundled.rs` が実際のバイナリを起動して同梱を検証する。
 
-追加の手順は 3 つ。
-
-1. `crates/engine-example` を作る
-2. `crates/cli/Cargo.toml` にクレートを足す
-3. `crates/cli/src/main.rs` でリンクする（忘れるとリンカが落とす）
-
-```rust
-use dobukasu_engine_example as _;
-```
-
-キーが要るエンジンは `enabled_by_default: false` にする。既定の検索を無料のまま保つため。リンク忘れは `crates/cli/tests/bundled.rs` が検出する。
-
-## 構成
+## 設計
 
 ```
 crates/core             Engine trait、コンパイル時レジストリ、順位統合、実行部
@@ -168,7 +152,9 @@ crates/cli              `dobukasu` バイナリ。同梱プラグインを全部
 skills/dobukasu         それを呼ぶエージェントスキル
 ```
 
-1 回の実行は、引数の解析 → エンジンの解決 → エンジンごとのタイムアウト付き並行実行 → URL の正規化と順位統合 → 件数の切り詰め → 出力、の順に流れる。
+1 回の実行は、引数の解析 → エンジンの解決 → 制限時間付きの並行実行 → URL の正規化と順位統合 → 件数の切り詰め → 出力、の順に流れる。
+
+URL は読み手が同一と見なす単位で比較する。大文字小文字、`www.`、フラグメント、トラッキングパラメータ、末尾スラッシュの違いは別のページにしない。スコアは `Σ 1 / (60 + 順位)` で、同点は最良順位、エンジンの順序、URL の順に解く。同じ入力なら同じ順序になる。
 
 ## テスト
 
@@ -178,23 +164,22 @@ cargo clippy --workspace --all-targets -- -D warnings
 cargo fmt --all -- --check
 ```
 
-方針は一つ。公開された継ぎ目から観察できる振る舞いだけを検証する。プロセス外の依存はエンジンだけなので、差し替えるのもエンジンだけ。URL の同一性、順位、引数解析、終了コード、エラー報告は、すべて本物を通して検証する。テストの形をこう決めた理由と、ミューテーションテストが見つけたものは [docs/testing.md](docs/testing.md) に書いた。
+公開された継ぎ目から観察できる振る舞いだけを検証する。プロセス外の依存はエンジンだけなので、差し替えるのもエンジンだけ。引数解析も実行部も順位統合も JSON 出力も、本物を通す。[docs/testing.md](docs/testing.md) に、テストの形とミューテーションテストが見つけたものを書いた。
 
 ```sh
 cargo install cargo-mutants
 cargo mutants --workspace
 ```
 
-## 既知の限界
+## 限界
 
-- **スクレイピングするエンジンはベストエフォート。** ボット対策が効いていると、Bing はエラーではなく無関係なページを `200` で返すことがあり、Google はホスト自体を拒否することがある。dobukasu は上流が返したものをそのまま報告し、拒否は拒否として伝えるが、マークアップから関連性は判断できない。結果がおかしいときは、クエリではなく上流がそう返している。
+- **スクレイピングするエンジンはベストエフォート。** ボット対策が効いていると、Bing は無関係なページを返し、DuckDuckGo は連打を制限し、Google は回線ごと拒否することがある。dobukasu は返ってきたものをそのまま報告し、拒否は拒否として伝えるが、マークアップから関連性は判断できない。
 - **ページングはない。** エンジンごとに 1 ページだけ。続きが欲しいときはクエリを言い換える。
-- **キャッシュはない。** 実行のたびに毎回問い合わせる。ループで叩くなら手前にキャッシュを置く。
-- **サーバはない。** 1 回の実行で 3 エンジンに聞いて終わる。これは意図した設計。
+- **キャッシュはない。** 実行のたびに毎回問い合わせる。
 
-## 法務とマナー
+## 法務
 
-dobukasu は公開されている検索結果ページをブラウザと同じように取得する。だからといって、有効にしたエンジンの利用規約や `robots.txt`、レート制限を無視してよい理由にはならない。自分の用途で、低い頻度で動かすこと。公式 API があるならそちらを優先すること（Google プラグインはそうしている）。使い方について作者は責任を負わない。
+dobukasu は公開されている検索結果ページをブラウザと同じように取得する。だからといって、有効にしたエンジンの利用規約や `robots.txt`、レート制限を無視してよい理由にはならない。低い頻度で動かし、公式 API があるならそちらを優先すること。
 
 ## ライセンス
 
