@@ -40,6 +40,10 @@ $ dobukasu "rust async runtime" --limit 3
 His technique carves a second into frames, and he moves faster than anyone by
 tracing every one of them.
 
+The pose has a name in the fandom — ドブカスラッシュ, the dobukasu rush: the
+technique swings his right arm for him, the left hand fixes his hair, and the
+face stays bored the whole time.
+
 `dobukasu` does the same to a query. Split it across engines, run every frame in
 parallel, and merge them into one answer that is faster and better sourced than
 any single engine could give you.
