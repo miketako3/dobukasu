@@ -32,6 +32,8 @@ pub enum DobukasuError {
     UnknownEngine(String),
     #[error("no engine is enabled")]
     NoEngineEnabled,
+    #[error("no engine is enabled by default; name one with --engines")]
+    NoDefaultEngine,
 }
 
 impl DobukasuError {
@@ -42,6 +44,7 @@ impl DobukasuError {
             Self::InvalidRequest(_) => "invalid_request",
             Self::UnknownEngine(_) => "unknown_engine",
             Self::NoEngineEnabled => "no_engine_enabled",
+            Self::NoDefaultEngine => "no_default_engine",
         }
     }
 }

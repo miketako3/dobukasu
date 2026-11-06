@@ -37,8 +37,12 @@ dobukasu engines                 # what this build can ask, and what is default
 Multi-word queries can be passed as one quoted argument or as several words.
 Every invocation is one process; there is no server to start.
 
-The binary is on `PATH` as `dobukasu`. If it is not, it lives at
-`~/.cargo/bin/dobukasu` or in a checkout at `target/release/dobukasu`.
+The binary is on `PATH` as `dobukasu`, usually at `~/.local/bin/dobukasu`.
+If it is missing, install it without building anything:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/miketako3/dobukasu/main/install.sh | sh
+```
 
 ## Reading the output
 

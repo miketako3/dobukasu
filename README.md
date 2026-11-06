@@ -55,9 +55,17 @@ next one.
 ## Install
 
 ```sh
+curl -fsSL https://raw.githubusercontent.com/miketako3/dobukasu/main/install.sh | sh
+```
+
+That downloads the prebuilt binary for macOS (arm64, x86_64) or Linux
+(x86_64) and puts it in `~/.local/bin`. `DOBUKASU_INSTALL_DIR` and
+`DOBUKASU_VERSION` override the destination and the release.
+
+From source, if you would rather build it:
+
+```sh
 cargo install --path crates/cli     # installs `dobukasu` into ~/.cargo/bin
-# or
-cargo build --release               # ./target/release/dobukasu
 ```
 
 ## Use
@@ -127,7 +135,8 @@ turned away" are different answers.
 ## Write an engine plugin
 
 An engine is a crate: it implements `Engine`, submits a `Plugin` with
-`inventory`, and gets linked into the binary. The core never imports it.
+`inventory`, and gets linked into the binary. The core never imports it, and
+adding one touches three files.
 
 ```rust
 pub const ID: &str = "example";
@@ -164,11 +173,21 @@ pub fn parse(html: &str) -> Vec<Hit> { /* selectors */ }
 
 Keep the parser a pure `&str -> Vec<Hit>` function. That is the engine's real
 contract with its upstream, it survives any refactor of the HTTP plumbing, and
-it is what the fixture tests exercise. Then link it in `crates/cli/src/main.rs`:
+it is what the fixture tests exercise.
+
+The three steps to add it:
+
+1. create `crates/engine-example` with the code above;
+2. list it in `crates/cli/Cargo.toml`;
+3. link it in `crates/cli/src/main.rs`, or the linker drops it:
 
 ```rust
 use dobukasu_engine_example as _;
 ```
+
+Set `enabled_by_default: false` when the engine needs a key, so the default
+search stays free. `crates/cli/tests/bundled.rs` fails if a bundled engine is
+never linked, which is the mistake this design invites.
 
 ## Architecture
 

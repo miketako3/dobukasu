@@ -43,9 +43,15 @@ $ dobukasu "rust async runtime" --limit 2
 ## インストール
 
 ```sh
+curl -fsSL https://raw.githubusercontent.com/miketako3/dobukasu/main/install.sh | sh
+```
+
+macOS（arm64 / x86_64）と Linux（x86_64）のビルド済みバイナリを取ってきて `~/.local/bin` に置く。`DOBUKASU_INSTALL_DIR` で置き場所、`DOBUKASU_VERSION` でバージョンを指定できる。
+
+ソースからビルドしたい場合:
+
+```sh
 cargo install --path crates/cli     # ~/.cargo/bin に dobukasu が入る
-# または
-cargo build --release               # ./target/release/dobukasu
 ```
 
 ## 使い方
@@ -102,7 +108,7 @@ cp -r skills/dobukasu ~/.agents/skills/
 
 ## エンジンを追加する
 
-エンジンはクレートにする。`Engine` を実装し、`inventory` で `Plugin` を登録し、バイナリにリンクする。コアはそのクレートを import しない。
+エンジンはクレートにする。`Engine` を実装し、`inventory` で `Plugin` を登録し、バイナリにリンクする。コアはそのクレートを import しない。追加で触るファイルは 3 つだけ。
 
 ```rust
 pub const ID: &str = "example";
@@ -137,11 +143,19 @@ impl Engine for Example {
 pub fn parse(html: &str) -> Vec<Hit> { /* セレクタ */ }
 ```
 
-パーサは `&str -> Vec<Hit>` の純粋関数にしておく。これが上流 HTML との実際の契約であり、HTTP 周りのリファクタリングに影響されず、フィクスチャテストが叩く対象になる。登録は `crates/cli/src/main.rs` でリンクするだけ。
+パーサは `&str -> Vec<Hit>` の純粋関数にしておく。これが上流 HTML との実際の契約であり、HTTP 周りのリファクタリングに影響されず、フィクスチャテストが叩く対象になる。
+
+追加の手順は 3 つ。
+
+1. `crates/engine-example` を作る
+2. `crates/cli/Cargo.toml` にクレートを足す
+3. `crates/cli/src/main.rs` でリンクする（忘れるとリンカが落とす）
 
 ```rust
 use dobukasu_engine_example as _;
 ```
+
+キーが要るエンジンは `enabled_by_default: false` にする。既定の検索を無料のまま保つため。リンク忘れは `crates/cli/tests/bundled.rs` が検出する。
 
 ## 構成
 
