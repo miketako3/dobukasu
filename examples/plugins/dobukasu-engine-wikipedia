@@ -1,0 +1,62 @@
+#!/usr/bin/env python3
+"""A minimal dobukasu engine: Wikipedia search, JSON over stdio.
+
+Install it:
+
+    mkdir -p ~/.config/dobukasu/plugins
+    cp dobukasu-engine-wikipedia ~/.config/dobukasu/plugins/
+    chmod +x ~/.config/dobukasu/plugins/dobukasu-engine-wikipedia
+    dobukasu "rust" --engines wikipedia
+
+That is the whole plug-in API: read one JSON request on stdin, write one JSON
+response on stdout, exit 0. No Rust, no rebuild, no ABI.
+"""
+
+import json
+import sys
+import urllib.parse
+import urllib.request
+
+ENDPOINT = "https://en.wikipedia.org/w/api.php"
+
+
+def search(text: str, limit: int) -> list[dict]:
+    query = urllib.parse.urlencode(
+        {
+            "action": "opensearch",
+            "format": "json",
+            "limit": min(max(limit, 1), 10),
+            "namespace": 0,
+            "search": text,
+        }
+    )
+    request = urllib.request.Request(
+        f"{ENDPOINT}?{query}",
+        headers={"User-Agent": "dobukasu-engine-wikipedia/1.0"},
+    )
+    with urllib.request.urlopen(request, timeout=8) as response:
+        _term, titles, snippets, urls = json.load(response)
+
+    return [
+        {"title": title, "url": url, "snippet": snippet}
+        for title, url, snippet in zip(titles, urls, snippets)
+        if title and url
+    ]
+
+
+def main() -> int:
+    try:
+        request = json.load(sys.stdin)
+        text = request["query"]["text"]
+        limit = int(request["query"].get("limit", 10))
+        hits = search(text, limit)
+    except Exception as error:  # noqa: BLE001 - the contract is "report, never crash"
+        json.dump({"v": 1, "error": str(error)}, sys.stdout)
+        return 0
+
+    json.dump({"v": 1, "hits": hits}, sys.stdout)
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

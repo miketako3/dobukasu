@@ -107,9 +107,21 @@ SearXNG はよくできている。ここで借りているのは思想で、画
 dobukasu engines   # 使えるもの、既定かどうか、使えないものはその理由
 ```
 
-## エンジンを追加する
+## プラグイン
 
-エンジンはクレートにする。`Engine` を実装し、`inventory` で `Plugin` を登録する。コアはそのクレートを import しないので、追加で触るのはクレート、`crates/cli/Cargo.toml`、`crates/cli/src/main.rs` の 1 行の 3 か所だけ。
+エンジンは、本体に組み込むクレートにも、置くだけの実行ファイルにもできます。
+
+**実行ファイル型プラグイン**が、第三者がエンジンを足すときの道。`dobukasu-engine-<id>` という名前で、標準入力の JSON を1つ読み、標準出力に JSON を1つ返すプログラムなら何でも構いません。Rust も再ビルドも ABI も要りません。
+
+```sh
+mkdir -p ~/.config/dobukasu/plugins
+cp dobukasu-engine-wikipedia ~/.config/dobukasu/plugins/ && chmod +x ~/.config/dobukasu/plugins/*
+dobukasu "rust" --engines wikipedia
+```
+
+書き方・試し方・入れ方・公開の仕方と、リクエストとレスポンスの正確な形は [docs/plugins.ja.md](docs/plugins.ja.md) に。動く例は [`examples/plugins/dobukasu-engine-wikipedia`](examples/plugins/dobukasu-engine-wikipedia)。
+
+**同梱エンジン**は Rust クレート。`Engine` を実装し、`inventory` で `Plugin` を登録する。コアはそのクレートを import しないので、追加で触るのはクレート、`crates/cli/Cargo.toml`、`crates/cli/src/main.rs` の 1 行の 3 か所だけ。
 
 ```rust
 pub const ID: &str = "example";

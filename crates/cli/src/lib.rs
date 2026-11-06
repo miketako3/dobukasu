@@ -6,6 +6,32 @@ use std::time::Duration;
 use dobukasu_core::{Registry, SearchOutcome, SearchQuery, plugins, search as run_search};
 use serde::Serialize;
 
+/// Directories searched for executable plug-ins.
+///
+/// `DOBUKASU_PLUGIN_PATH` wins (colon-separated); otherwise the conventional
+/// `~/.config/dobukasu/plugins`, which is where the documentation tells people
+/// to drop a file.
+#[must_use]
+pub fn plugin_directories(configured: Option<&str>, home: Option<&str>) -> Vec<std::path::PathBuf> {
+    if let Some(list) = configured {
+        let dirs: Vec<std::path::PathBuf> = list
+            .split(':')
+            .map(str::trim)
+            .filter(|dir| !dir.is_empty())
+            .map(std::path::PathBuf::from)
+            .collect();
+        if !dirs.is_empty() {
+            return dirs;
+        }
+    }
+    match home {
+        Some(home) if !home.is_empty() => {
+            vec![std::path::PathBuf::from(home).join(".config/dobukasu/plugins")]
+        }
+        _ => Vec::new(),
+    }
+}
+
 /// Default per-engine deadline.
 pub const DEFAULT_TIMEOUT_MS: u64 = 8_000;
 /// Default number of merged results.
@@ -126,6 +152,7 @@ struct EngineEntry {
     label: &'static str,
     description: &'static str,
     default: bool,
+    source: &'static str,
 }
 
 #[derive(Serialize)]
@@ -144,6 +171,11 @@ fn engines_json(registry: &Registry) -> String {
                 label: plugin.map_or(id, |plugin| plugin.label),
                 description: plugin.map_or("", |plugin| plugin.description),
                 default: registry.is_default(id),
+                source: if plugin.is_some() {
+                    "bundled"
+                } else {
+                    "external"
+                },
             }
         })
         .collect();

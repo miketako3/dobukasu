@@ -126,6 +126,35 @@ impl Registry {
         self.defaults.iter().any(|default| default == id)
     }
 
+    /// Add an engine discovered at runtime. External engines are reachable by
+    /// name and join the default set only when `make_default` is set.
+    pub fn add(&mut self, engine: Arc<dyn Engine>, make_default: bool) {
+        let id = engine.id();
+        if !self.order.contains(&id) {
+            self.order.push(id);
+        }
+        self.engines.insert(id, engine);
+        if make_default && !self.defaults.iter().any(|known| known == id) {
+            self.defaults.push(id.to_owned());
+        }
+    }
+
+    /// Replace the default set, e.g. from `DOBUKASU_ENGINES`.
+    pub fn set_defaults(&mut self, ids: &[String]) -> Result<(), DobukasuError> {
+        for id in ids {
+            if !self.engines.contains_key(id.as_str()) {
+                return Err(match self.unavailable.get(id.as_str()) {
+                    Some(reason) => DobukasuError::InvalidRequest(format!(
+                        "engine {id} is unavailable: {reason}"
+                    )),
+                    None => DobukasuError::UnknownEngine(id.clone()),
+                });
+            }
+        }
+        self.defaults = ids.to_vec();
+        Ok(())
+    }
+
     /// Plug-ins that are linked in but not usable, and why.
     #[must_use]
     pub fn unavailable(&self) -> &BTreeMap<&'static str, String> {

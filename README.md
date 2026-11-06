@@ -130,11 +130,28 @@ is the one that always works.
 dobukasu engines   # what is available, which are default, and what is not, and why
 ```
 
-## Add an engine
+## Plug-ins
 
-An engine is a crate that implements `Engine` and submits a `Plugin` with
-`inventory`. The core never imports it, so adding one touches three files:
-the crate, `crates/cli/Cargo.toml`, and one line in `crates/cli/src/main.rs`.
+An engine can be a compiled-in crate or an executable you drop in a directory.
+
+**Executable plug-ins** are the way third parties add engines: any program named
+`dobukasu-engine-<id>` that reads one JSON request on stdin and writes one JSON
+response on stdout. No Rust, no rebuild, no ABI.
+
+```sh
+mkdir -p ~/.config/dobukasu/plugins
+cp dobukasu-engine-wikipedia ~/.config/dobukasu/plugins/ && chmod +x ~/.config/dobukasu/plugins/*
+dobukasu "rust" --engines wikipedia
+```
+
+Write, test, install and publish instructions, plus the exact request/response
+shape: [`docs/plugins.md`](docs/plugins.md). A runnable example:
+[`examples/plugins/dobukasu-engine-wikipedia`](examples/plugins/dobukasu-engine-wikipedia).
+
+**Bundled engines** are Rust crates. One implements `Engine` and submits a
+`Plugin` with `inventory`; the core never imports it, so adding one touches
+three files: the crate, `crates/cli/Cargo.toml`, and one line in
+`crates/cli/src/main.rs`.
 
 ```rust
 pub const ID: &str = "example";

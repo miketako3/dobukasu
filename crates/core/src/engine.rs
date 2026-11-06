@@ -38,6 +38,19 @@ impl EngineContext {
         }
     }
 
+    /// The deadline every engine is given.
+    #[must_use]
+    pub fn timeout(&self) -> Duration {
+        self.timeout
+    }
+
+    /// The user agent the host would send, for engines that build their own
+    /// requests through an external process.
+    #[must_use]
+    pub fn user_agent(&self) -> &str {
+        &self.user_agent
+    }
+
     pub fn request(&self, url: Url) -> reqwest::RequestBuilder {
         self.request_as(url, &self.user_agent.clone())
     }

@@ -3,6 +3,7 @@
 
 mod engine;
 mod error;
+mod external;
 mod merge;
 mod model;
 mod registry;
@@ -10,6 +11,7 @@ mod search;
 
 pub use engine::{Engine, EngineContext, Plugin, plugins};
 pub use error::{DobukasuError, EngineError};
+pub use external::{ExternalEngine, PLUGIN_PREFIX, discover};
 pub use merge::{canonical_url, fuse};
 pub use model::{
     EngineHits, EngineReport, EngineStatus, Hit, SearchOutcome, SearchQuery, SearchResult,
